@@ -20,6 +20,8 @@ const Index = () => {
 
   const handleDataProcessed = (data: any[], header: any, styles: any) => {
     console.log('Data processed in Index:', data);
+    console.log('Original header:', header);
+    console.log('Original styles:', styles);
     setExcelData(data);
     setOriginalHeader(header);
     setOriginalStyles(styles);
@@ -56,15 +58,47 @@ const Index = () => {
     }
 
     try {
+      console.log('Starting export...');
+      console.log('Original header:', originalHeader);
+      console.log('Excel data sample:', excelData[0]);
+      
       const wb = XLSX.utils.book_new();
       
-      const dataWithHeader = [
-        Object.values(originalHeader || {}),
-        ...excelData.map(row => [row.Material, row.Producto, row.UMB, row.Stock])
-      ];
+      // Crear el encabezado original preservando el orden correcto
+      const headerRow = [];
+      const columnOrder = ['A', 'B', 'C', 'D']; // Material, Producto, UMB, Stock
       
-      const ws = XLSX.utils.aoa_to_sheet(dataWithHeader);
+      // Reconstruir el encabezado en el orden correcto
+      for (const col of columnOrder) {
+        if (originalHeader[col]) {
+          headerRow.push(originalHeader[col]);
+        }
+      }
       
+      // Si no tenemos encabezado original, usar el estándar
+      if (headerRow.length === 0) {
+        headerRow.push('MATERIAL', 'PRODUCTO', 'UMB', 'STOCK');
+      }
+      
+      console.log('Header row:', headerRow);
+      
+      // Crear los datos manteniendo el orden correcto: Material, Producto, UMB, Stock
+      const dataRows = excelData.map(row => [
+        row.Material,
+        row.Producto, 
+        row.UMB,
+        row.Stock
+      ]);
+      
+      console.log('Data rows sample:', dataRows[0]);
+      
+      // Combinar encabezado y datos
+      const allData = [headerRow, ...dataRows];
+      
+      // Crear la hoja de cálculo
+      const ws = XLSX.utils.aoa_to_sheet(allData);
+      
+      // Aplicar estilos al encabezado
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
       
       const headerStyle = {
@@ -73,21 +107,25 @@ const Index = () => {
         alignment: { horizontal: "center" }
       };
       
+      // Aplicar estilos y convertir a mayúsculas el encabezado
       for (let col = range.s.c; col <= range.e.c; col++) {
         const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
         if (!ws[cellAddress]) ws[cellAddress] = {};
         ws[cellAddress].s = headerStyle;
         
+        // Convertir a mayúsculas
         if (ws[cellAddress].v) {
           ws[cellAddress].v = String(ws[cellAddress].v).toUpperCase();
         }
       }
       
+      // Configurar anchos de columna
       const colWidths = [];
       
       for (let col = range.s.c; col <= range.e.c; col++) {
         let maxWidth = 0;
         
+        // Calcular el ancho máximo para cada columna
         for (let row = range.s.r; row <= range.e.r; row++) {
           const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
           const cell = ws[cellAddress];
@@ -97,19 +135,26 @@ const Index = () => {
           }
         }
         
+        // Para la columna Producto (columna B, índice 1), asegurar ancho mínimo adecuado
         if (col === 1) {
-          maxWidth = Math.max(maxWidth, 25);
+          maxWidth = Math.max(maxWidth, 30);
         }
         
-        colWidths.push({ wch: Math.max(8, Math.min(50, maxWidth + 2)) });
+        colWidths.push({ wch: Math.max(10, Math.min(60, maxWidth + 2)) });
       }
       
       ws['!cols'] = colWidths;
       
+      // Añadir la hoja al libro
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
       
+      // Generar nombre del archivo
       const exportFileName = (fileName || "inventario").replace(/\.[^/.]+$/, "") + "_inventario.xlsx";
+      
+      // Exportar el archivo
       XLSX.writeFile(wb, exportFileName);
+      
+      console.log('Export completed successfully');
       
       toast({
         title: "Archivo exportado exitosamente",
@@ -144,10 +189,10 @@ const Index = () => {
             <Button 
               onClick={exportExcel}
               size="lg"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
             >
               <Download className="w-5 h-5" />
-              Exportar Inventario Final
+              Exportar Inventario Final ({excelData.length} productos)
             </Button>
           </div>
         )}
@@ -160,7 +205,7 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="inventory" className="flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Inventario
+              Inventario ({excelData.length})
             </TabsTrigger>
             <TabsTrigger value="voice" className="flex items-center gap-2">
               <Mic className="w-4 h-4" />
@@ -179,9 +224,9 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <ExcelProcessor 
-                  onDataProcessed={(data, header, styles) => {
+                  onDataProcessed={(data, header, styles, filename) => {
                     handleDataProcessed(data, header, styles);
-                    setFileName('economato'); // Set a default filename
+                    setFileName(filename || 'economato');
                   }}
                   existingData={excelData}
                   originalHeader={originalHeader}

@@ -8,7 +8,7 @@ import { Upload, FileSpreadsheet, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ExcelProcessorProps {
-  onDataProcessed: (data: any[], originalHeader: any, originalStyles: any) => void;
+  onDataProcessed: (data: any[], originalHeader: any, originalStyles: any, fileName?: string) => void;
   existingData: any[];
   originalHeader: any;
   originalStyles: any;
@@ -37,26 +37,32 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         const headerRow: any = {};
         const headerStyles: any = {};
         
+        console.log('Processing Excel file with range:', range);
+        
         // Guardar encabezado original (primera fila)
         for (let col = range.s.c; col <= range.e.c; col++) {
           const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
           const cell = worksheet[cellAddress];
           if (cell) {
-            headerRow[XLSX.utils.encode_col(col)] = cell.v;
+            const colLetter = XLSX.utils.encode_col(col);
+            headerRow[colLetter] = cell.v;
             headerStyles[cellAddress] = cell.s || {};
+            console.log(`Header ${colLetter}: ${cell.v}`);
           }
         }
         
-        // Convertir datos empezando desde la fila 2
+        // Convertir datos empezando desde la fila 2 (fila 1 es el encabezado)
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-          range: 1, // Empezar desde la fila 2
-          header: ['Material', 'Producto', 'UMB', 'Stock']
+          range: 1, // Empezar desde la fila 2 (índice 1)
+          header: ['Material', 'Producto', 'UMB', 'Stock'],
+          defval: '' // Valor por defecto para celdas vacías
         });
         
-        console.log('Excel data processed:', jsonData);
+        console.log('Excel data processed:', jsonData.length, 'rows');
+        console.log('Sample data:', jsonData.slice(0, 3));
         console.log('Original header:', headerRow);
         
-        onDataProcessed(jsonData, headerRow, headerStyles);
+        onDataProcessed(jsonData, headerRow, headerStyles, file.name);
         
         toast({
           title: "Archivo procesado exitosamente",
@@ -107,8 +113,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
       'application/vnd.ms-excel': ['.xls'],
       'text/csv': ['.csv']
     },
-    multiple: false,
-    noClick: true // Disable click on the dropzone itself
+    multiple: false
   });
 
   return (
@@ -117,7 +122,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         <CardContent className="p-6">
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
               isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
             }`}
           >
@@ -136,7 +141,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
                   {isDragActive ? 'Suelta el archivo aquí...' : 'Arrastra el archivo Excel del economato aquí'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Formatos soportados: .xlsx, .xls, .csv
+                  o haz clic para seleccionar. Formatos: .xlsx, .xls, .csv
                 </p>
               </div>
               <Button 

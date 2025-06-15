@@ -21,7 +21,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [stockInput, setStockInput] = useState('');
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -36,7 +36,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       recognitionRef.current.lang = 'es-ES';
       recognitionRef.current.maxAlternatives = 1;
 
-      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
+      recognitionRef.current.onresult = (event: any) => {
         let currentTranscript = '';
         let finalTranscript = '';
         
@@ -120,23 +120,24 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
     // Comando de búsqueda
     if (lowerCommand.includes('buscar') || lowerCommand.includes('encontrar')) {
-      const searchTerm = lowerCommand.replace(/buscar|encontrar/gi, '').trim();
-      if (searchTerm) {
-        console.log('Voice search for:', searchTerm);
-        setSearchTerm(searchTerm);
-        searchProducts(searchTerm);
-        const result = `Buscando: ${searchTerm}`;
+      const searchTermFromVoice = lowerCommand.replace(/buscar|encontrar/gi, '').trim();
+      if (searchTermFromVoice) {
+        console.log('Voice search for:', searchTermFromVoice);
+        setSearchTerm(searchTermFromVoice);
+        searchProducts(searchTermFromVoice);
+        const result = `Buscando: ${searchTermFromVoice}`;
         setCommandResult(result);
         speak(result);
       }
       return;
     }
 
-    // Comando para actualizar stock
+    // Comando para actualizar stock - patrones más flexibles
     const patterns = [
       /(.+?)\s+(\d+(?:[.,]\d+)?)$/,
       /actualizar\s+(.+?)\s+a\s+(\d+(?:[.,]\d+)?)/i,
-      /(.+?)\s+cantidad\s+(\d+(?:[.,]\d+)?)/i
+      /(.+?)\s+cantidad\s+(\d+(?:[.,]\d+)?)/i,
+      /(.+?)\s+stock\s+(\d+(?:[.,]\d+)?)/i
     ];
 
     for (const pattern of patterns) {
@@ -147,22 +148,23 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         const stock = parseFloat(stockValue);
         
         if (!isNaN(stock)) {
-          console.log('Trying to update:', productName, 'to', stock);
+          console.log('Trying to update product:', productName, 'to stock:', stock);
           
-          // Buscar producto
+          // Buscar producto con mayor flexibilidad
           const foundProduct = excelData.find(item => {
             if (!item.Producto) return false;
             const itemName = item.Producto.toLowerCase();
             const searchName = productName.toLowerCase();
             
-            // Búsqueda exacta o parcial
+            // Búsqueda más flexible
             return itemName.includes(searchName) || 
                    searchName.includes(itemName) ||
-                   itemName.split(' ').some(word => searchName.includes(word));
+                   itemName.split(' ').some(word => searchName.includes(word)) ||
+                   searchName.split(' ').some(word => itemName.includes(word));
           });
           
           if (foundProduct) {
-            console.log('Found product:', foundProduct.Producto);
+            console.log('Found and updating product:', foundProduct.Producto);
             onUpdateStock(foundProduct.Producto, stock);
             const result = `Stock actualizado: ${foundProduct.Producto} = ${stock}`;
             setCommandResult(result);
@@ -170,7 +172,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             return;
           } else {
             console.log('Product not found for:', productName);
-            const result = `No se encontró: ${productName}`;
+            const result = `No se encontró el producto: ${productName}`;
             setCommandResult(result);
             speak('Producto no encontrado');
             return;
@@ -199,7 +201,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
   const speak = (text: string) => {
     if ('speechSynthesis' in window) {
-      speechSynthesis.cancel(); // Cancelar cualquier síntesis en curso
+      speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'es-ES';
       utterance.rate = 0.8;
@@ -238,7 +240,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputInput>) => {
     const value = e.target.value;
     setSearchTerm(value);
     searchProducts(value);
@@ -248,18 +250,24 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setSelectedProduct(product);
     setSearchResults([]);
     setSearchTerm('');
+    setStockInput('');
   };
 
   const updateSelectedProductStock = () => {
     if (selectedProduct && stockInput) {
       const stock = parseFloat(stockInput.replace(',', '.'));
       if (!isNaN(stock)) {
+        console.log('Updating selected product stock:', selectedProduct.Producto, 'to', stock);
         onUpdateStock(selectedProduct.Producto, stock);
         const result = `Stock actualizado: ${selectedProduct.Producto} = ${stock}`;
         setCommandResult(result);
         speak(`Stock actualizado a ${stock}`);
         setSelectedProduct(null);
         setStockInput('');
+        toast({
+          title: "Stock actualizado",
+          description: `${selectedProduct.Producto}: ${stock}`,
+        });
       }
     }
   };
@@ -284,16 +292,16 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             </div>
             
             {searchResults.length > 0 && (
-              <div className="border rounded-lg max-h-60 overflow-y-auto">
+              <div className="border rounded-lg max-h-60 overflow-y-auto bg-white shadow-lg">
                 {searchResults.map((product, index) => (
                   <div
                     key={index}
-                    className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                    className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 transition-colors"
                     onClick={() => selectProduct(product)}
                   >
-                    <div className="font-medium">{product.Producto}</div>
+                    <div className="font-medium text-gray-900">{product.Producto}</div>
                     <div className="text-sm text-gray-500">
-                      Código: {product.Material} | Stock: {Number(product.Stock || 0).toFixed(1)} {product.UMB}
+                      Código: {product.Material} | Stock actual: {Number(product.Stock || 0).toFixed(1)} {product.UMB}
                     </div>
                   </div>
                 ))}
@@ -321,8 +329,13 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                         value={stockInput}
                         onChange={(e) => setStockInput(e.target.value)}
                         className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            updateSelectedProductStock();
+                          }
+                        }}
                       />
-                      <Button onClick={updateSelectedProductStock}>
+                      <Button onClick={updateSelectedProductStock} disabled={!stockInput}>
                         Actualizar
                       </Button>
                       <Button variant="outline" onClick={() => {setSelectedProduct(null); setStockInput('');}}>
@@ -412,14 +425,14 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         <CardContent>
           <ul className="text-sm text-gray-600 space-y-2">
             <li><strong>• "Buscar [producto]"</strong> - Busca productos</li>
-            <li><strong>• "[producto] [cantidad]"</strong> - Actualiza stock</li>
+            <li><strong>• "[producto] [cantidad]"</strong> - Actualiza stock directamente</li>
             <li><strong>• "Actualizar [producto] a [cantidad]"</strong> - Actualiza stock</li>
             <li>• "¿Cuántos productos?" - Cuenta productos</li>
             <li>• "Limpiar" - Limpia resultados</li>
           </ul>
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-700">
-              <strong>Ejemplos:</strong> "Buscar leche", "Leche 5.5", "Pan 3"
+              <strong>Ejemplos:</strong> "Buscar aceite", "Aceite 5.5", "Azúcar 3"
             </p>
           </div>
         </CardContent>
