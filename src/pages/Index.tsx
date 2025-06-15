@@ -30,13 +30,13 @@ const Index = () => {
     }
   };
 
-  const handleUpdateStock = (productName: string, newStock: number) => {
-    console.log('Actualizando stock:', productName, newStock);
+  const handleUpdateStock = (index: number, newStock: number) => {
+    console.log('🔄 Actualizando stock por ÍNDICE:', index, 'nuevo valor:', newStock);
     
     setExcelData(prevData => {
-      return prevData.map(item => {
-        if (item && item.Producto === productName) {
-          console.log('Stock actualizado:', productName, newStock);
+      return prevData.map((item, itemIndex) => {
+        if (itemIndex === index) {
+          console.log('✅ Stock actualizado en índice:', index, 'de', item.Stock, 'a', newStock);
           return { ...item, Stock: newStock };
         }
         return item;
