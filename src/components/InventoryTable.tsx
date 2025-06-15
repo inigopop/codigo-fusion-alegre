@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,32 +14,37 @@ interface InventoryTableProps {
 const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [localStocks, setLocalStocks] = useState<{[key: number]: number}>({});
 
-  const startEdit = (index: number, currentStock: number) => {
+  const startEdit = useCallback((index: number, currentStock: number) => {
     console.log('Starting edit for index:', index, 'current stock:', currentStock);
     setEditingIndex(index);
     setEditValue(currentStock.toString());
-  };
+    // Store the original stock value locally
+    setLocalStocks(prev => ({ ...prev, [index]: currentStock }));
+  }, []);
 
-  const saveEdit = () => {
+  const saveEdit = useCallback(() => {
     console.log('Saving edit for index:', editingIndex, 'new value:', editValue);
     if (editingIndex !== null) {
       const numericValue = parseFloat(editValue);
       if (!isNaN(numericValue)) {
         onUpdateStock(editingIndex, numericValue);
+        // Update local state
+        setLocalStocks(prev => ({ ...prev, [editingIndex]: numericValue }));
       }
       setEditingIndex(null);
       setEditValue('');
     }
-  };
+  }, [editingIndex, editValue, onUpdateStock]);
 
-  const cancelEdit = () => {
+  const cancelEdit = useCallback(() => {
     console.log('Canceling edit for index:', editingIndex);
     setEditingIndex(null);
     setEditValue('');
-  };
+  }, [editingIndex]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       saveEdit();
@@ -47,17 +52,23 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
       e.preventDefault();
       cancelEdit();
     }
-  };
+  }, [saveEdit, cancelEdit]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('Input change for index:', editingIndex, 'value:', e.target.value);
-    setEditValue(e.target.value);
-  };
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    console.log('Input change for index:', editingIndex, 'value:', value);
+    setEditValue(value);
+  }, [editingIndex]);
 
-  const handleInputBlur = () => {
-    // Don't auto-save on blur for mobile devices to prevent accidental saves
-    console.log('Input blur for index:', editingIndex);
-  };
+  const handleInputFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    // Prevent iOS from zooming in
+    e.target.style.fontSize = '16px';
+  }, []);
+
+  const getDisplayStock = useCallback((index: number, originalStock: number) => {
+    // Use local stock if available, otherwise use original
+    return localStocks[index] !== undefined ? localStocks[index] : originalStock;
+  }, [localStocks]);
 
   if (data.length === 0) {
     return (
@@ -92,71 +103,77 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((row, index) => (
-                <TableRow key={`${row.Material}-${row.Producto}-${index}`}>
-                  <TableCell className="font-mono text-sm">{row.Material}</TableCell>
-                  <TableCell className="font-medium max-w-[200px]">
-                    <div className="truncate" title={row.Producto}>
-                      {row.Producto}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">{row.UMB}</TableCell>
-                  <TableCell>
-                    {editingIndex === index ? (
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={editValue}
-                        onChange={handleInputChange}
-                        onKeyDown={handleKeyPress}
-                        onBlur={handleInputBlur}
-                        className="w-20 text-center"
-                        autoFocus
-                        inputMode="decimal"
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck="false"
-                      />
-                    ) : (
-                      <span className="font-mono">
-                        {Number(row.Stock || 0).toFixed(1)}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {editingIndex === index ? (
-                      <div className="flex gap-1">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={saveEdit}
-                          className="touch-manipulation"
-                        >
-                          <Save className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={cancelEdit}
-                          className="touch-manipulation"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
+              {data.map((row, index) => {
+                const uniqueKey = `${row.Material}-${index}-${row.Producto?.substring(0, 10)}`;
+                const displayStock = getDisplayStock(index, Number(row.Stock || 0));
+                
+                return (
+                  <TableRow key={uniqueKey}>
+                    <TableCell className="font-mono text-sm">{row.Material}</TableCell>
+                    <TableCell className="font-medium max-w-[200px]">
+                      <div className="truncate" title={row.Producto}>
+                        {row.Producto}
                       </div>
-                    ) : (
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        onClick={() => startEdit(index, Number(row.Stock || 0))}
-                        className="touch-manipulation"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="text-center">{row.UMB}</TableCell>
+                    <TableCell>
+                      {editingIndex === index ? (
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={editValue}
+                          onChange={handleInputChange}
+                          onKeyDown={handleKeyPress}
+                          onFocus={handleInputFocus}
+                          className="w-20 text-center text-base"
+                          autoFocus
+                          inputMode="decimal"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck="false"
+                          data-index={index}
+                        />
+                      ) : (
+                        <span className="font-mono">
+                          {displayStock.toFixed(1)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingIndex === index ? (
+                        <div className="flex gap-1">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={saveEdit}
+                            className="touch-manipulation min-h-[44px] min-w-[44px]"
+                          >
+                            <Save className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={cancelEdit}
+                            className="touch-manipulation min-h-[44px] min-w-[44px]"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={() => startEdit(index, displayStock)}
+                          className="touch-manipulation min-h-[44px] min-w-[44px]"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
