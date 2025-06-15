@@ -43,7 +43,7 @@ const Index = () => {
     });
   };
 
-  // Función de exportación mejorada con encabezado principal y estilos específicos
+  // Función de exportación corregida con estilos específicos
   const exportExcel = () => {
     console.log('=== EXPORTACIÓN CON ENCABEZADO PRINCIPAL Y ESTILOS ===');
     
@@ -73,15 +73,35 @@ const Index = () => {
 
       console.log('Exportando', exportData.length, 'productos con encabezado principal');
 
-      // Crear libro y hoja
+      // Crear libro de trabajo
       const wb = XLSX.utils.book_new();
-      const ws = {};
+      
+      // Crear hoja manualmente
+      const ws_data = [];
+      
+      // Fila 1: Encabezado principal
+      ws_data.push([tituloCompleto, '', '', '']);
+      
+      // Fila 2: Vacía
+      ws_data.push(['', '', '', '']);
+      
+      // Fila 3: Títulos de columnas
+      ws_data.push(['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK']);
+      
+      // Filas de datos
+      exportData.forEach(item => {
+        ws_data.push([item.MATERIAL, item.PRODUCTO, item.UMB, item.STOCK]);
+      });
 
-      // PASO 1: Crear encabezado principal (fila 1) - fondo amarillo
-      ws['A1'] = { v: tituloCompleto, t: 's' };
+      // Crear la hoja de trabajo
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+      // Aplicar estilos manualmente
+      
+      // Estilo para el encabezado principal (A1) - Fondo amarillo
       ws['A1'].s = {
         font: { bold: true, sz: 45, color: { rgb: "000000" } },
-        fill: { fgColor: { rgb: "FFFF05" } }, // Amarillo #ffff05
+        fill: { fgColor: { rgb: "FFFF05" } },
         alignment: { horizontal: "center", vertical: "center" },
         border: {
           top: { style: "thin", color: { rgb: "000000" } },
@@ -91,18 +111,11 @@ const Index = () => {
         }
       };
 
-      // Combinar celdas para el título principal (A1:D1)
-      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-
-      // PASO 2: Crear títulos de columnas (fila 3) - fondo gris
-      const columnHeaders = ['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK'];
-      columnHeaders.forEach((header, index) => {
-        const cellAddress = XLSX.utils.encode_cell({ r: 2, c: index }); // Fila 3 (índice 2)
-        ws[cellAddress] = { v: header, t: 's' };
-        ws[cellAddress].s = {
-          font: { bold: true, color: { rgb: "000000" } },
-          fill: { fgColor: { rgb: "D3D3D3" } }, // Gris
-          alignment: { horizontal: "center", vertical: "center" },
+      // Aplicar el mismo estilo a las celdas combinadas del encabezado
+      ['B1', 'C1', 'D1'].forEach(cell => {
+        if (!ws[cell]) ws[cell] = { v: '', t: 's' };
+        ws[cell].s = {
+          fill: { fgColor: { rgb: "FFFF05" } },
           border: {
             top: { style: "thin", color: { rgb: "000000" } },
             bottom: { style: "thin", color: { rgb: "000000" } },
@@ -112,22 +125,27 @@ const Index = () => {
         };
       });
 
-      // PASO 3: Agregar datos (desde fila 4)
-      exportData.forEach((item, rowIndex) => {
-        const dataRow = rowIndex + 3; // Empezar en fila 4 (índice 3)
-        
-        // MATERIAL
-        ws[`A${dataRow + 1}`] = { v: item.MATERIAL, t: 's' };
-        // PRODUCTO  
-        ws[`B${dataRow + 1}`] = { v: item.PRODUCTO, t: 's' };
-        // UMB
-        ws[`C${dataRow + 1}`] = { v: item.UMB, t: 's' };
-        // STOCK
-        ws[`D${dataRow + 1}`] = { v: item.STOCK, t: 'n' };
+      // Estilos para los títulos de columnas (fila 3) - Fondo gris
+      ['A3', 'B3', 'C3', 'D3'].forEach(cell => {
+        if (ws[cell]) {
+          ws[cell].s = {
+            font: { bold: true, color: { rgb: "000000" } },
+            fill: { fgColor: { rgb: "D3D3D3" } },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: {
+              top: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } }
+            }
+          };
+        }
+      });
 
-        // Aplicar estilos a las celdas de datos
+      // Estilos para las celdas de datos
+      for (let row = 4; row <= exportData.length + 3; row++) {
         ['A', 'B', 'C', 'D'].forEach((col, colIndex) => {
-          const cellAddress = `${col}${dataRow + 1}`;
+          const cellAddress = `${col}${row}`;
           if (ws[cellAddress]) {
             ws[cellAddress].s = {
               border: {
@@ -136,26 +154,29 @@ const Index = () => {
                 left: { style: "thin", color: { rgb: "000000" } },
                 right: { style: "thin", color: { rgb: "000000" } }
               },
-              alignment: { horizontal: colIndex === 1 ? "left" : "center" } // Producto alineado a la izquierda
+              alignment: { horizontal: colIndex === 1 ? "left" : "center" }
             };
           }
         });
-      });
+      }
+
+      // Combinar celdas para el título principal (A1:D1)
+      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
 
       // Configurar rango de la hoja
       ws['!ref'] = `A1:D${exportData.length + 3}`;
 
-      // Configurar anchos de columna optimizados
+      // Configurar anchos de columna
       ws['!cols'] = [
         { wch: 15 }, // MATERIAL
-        { wch: 40 }, // PRODUCTO - mucho más ancho para descripciones largas
+        { wch: 40 }, // PRODUCTO
         { wch: 8 },  // UMB
         { wch: 12 }  // STOCK
       ];
 
       // Configurar altura de filas
       ws['!rows'] = [
-        { hpt: 60 }, // Encabezado principal más alto (45px font)
+        { hpt: 60 }, // Encabezado principal
         { hpt: 10 }, // Fila vacía
         { hpt: 25 }, // Títulos de columnas
         ...Array(exportData.length).fill({ hpt: 20 }) // Filas de datos
