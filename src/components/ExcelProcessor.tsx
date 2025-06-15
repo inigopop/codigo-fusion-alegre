@@ -47,10 +47,10 @@ const ExcelProcessor = ({ onDataProcessed, existingData, originalHeader, origina
           }
         }
         
-        // Convertir datos sin el encabezado (empezando desde la fila 2)
+        // Convertir datos empezando desde la fila 2, manteniendo los nombres de columnas originales
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
           range: 1, // Empezar desde la fila 2 (índice 1)
-          header: ['Producto', 'Precio', 'Stock', 'Categoria'] // Nombres de columnas estándar
+          header: ['Material', 'Producto', 'UMB', 'Stock'] // Nombres correctos de columnas
         });
         
         console.log('Excel data processed:', jsonData);
@@ -95,7 +95,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData, originalHeader, origina
       // Preparar datos con encabezado original
       const dataWithHeader = [
         Object.values(originalHeader || {}),
-        ...existingData.map(row => [row.Producto, row.Precio, row.Stock, row.Categoria])
+        ...existingData.map(row => [row.Material, row.Producto, row.UMB, row.Stock])
       ];
       
       // Crear worksheet
@@ -123,13 +123,14 @@ const ExcelProcessor = ({ onDataProcessed, existingData, originalHeader, origina
         }
       }
       
-      // Ajustar ancho de columnas
+      // Calcular ancho de columnas
       const colWidths = [];
       
-      // Calcular ancho mínimo para cada columna
+      // Para cada columna, calcular el ancho necesario
       for (let col = range.s.c; col <= range.e.c; col++) {
         let maxWidth = 0;
         
+        // Revisar todas las filas de esta columna
         for (let row = range.s.r; row <= range.e.r; row++) {
           const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
           const cell = ws[cellAddress];
@@ -139,8 +140,13 @@ const ExcelProcessor = ({ onDataProcessed, existingData, originalHeader, origina
           }
         }
         
-        // Ancho mínimo de 10, máximo de 50
-        colWidths.push({ wch: Math.max(10, Math.min(50, maxWidth + 2)) });
+        // Para la columna de Producto (índice 1), asegurar que tenga suficiente ancho
+        if (col === 1) { // Columna Producto
+          maxWidth = Math.max(maxWidth, 25); // Ancho mínimo para productos
+        }
+        
+        // Ancho mínimo de 8, máximo de 50
+        colWidths.push({ wch: Math.max(8, Math.min(50, maxWidth + 2)) });
       }
       
       ws['!cols'] = colWidths;
@@ -176,47 +182,44 @@ const ExcelProcessor = ({ onDataProcessed, existingData, originalHeader, origina
     });
   };
 
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: (acceptedFiles: File[]) => {
+      const file = acceptedFiles[0];
+      if (file) processExcelFile(file);
+    },
+    accept: {
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.ms-excel': ['.xls'],
+      'text/csv': ['.csv']
+    },
+    multiple: false
+  });
+
   return (
     <div className="space-y-4">
       <Card>
         <CardContent className="p-6">
           <div
-            {...useDropzone({
-              onDrop: (acceptedFiles: File[]) => {
-                const file = acceptedFiles[0];
-                if (file) processExcelFile(file);
-              },
-              accept: {
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-                'application/vnd.ms-excel': ['.xls'],
-                'text/csv': ['.csv']
-              },
-              multiple: false
-            }).getRootProps()}
-            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors border-gray-300 hover:border-gray-400"
+            {...getRootProps()}
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+              isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+            }`}
           >
-            <input {...useDropzone({
-              onDrop: (acceptedFiles: File[]) => {
-                const file = acceptedFiles[0];
-                if (file) processExcelFile(file);
-              },
-              accept: {
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-                'application/vnd.ms-excel': ['.xls'],
-                'text/csv': ['.csv']
-              },
-              multiple: false
-            }).getInputProps()} />
+            <input {...getInputProps()} />
             <div className="flex flex-col items-center space-y-4">
               <Upload className="w-12 h-12 text-gray-400" />
               <div>
                 <p className="text-lg font-medium text-gray-700">
-                  Arrastra el archivo Excel del economato o haz clic para seleccionar
+                  {isDragActive ? 'Suelta el archivo aquí...' : 'Arrastra el archivo Excel del economato o haz clic para seleccionar'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
                   Formatos soportados: .xlsx, .xls, .csv
                 </p>
               </div>
+              <Button variant="outline" className="mt-4">
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Seleccionar Archivo
+              </Button>
             </div>
           </div>
         </CardContent>

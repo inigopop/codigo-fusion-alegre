@@ -2,7 +2,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mic, MicOff, Volume2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Mic, MicOff, Volume2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
@@ -16,19 +17,23 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [transcript, setTranscript] = useState('');
   const [lastCommand, setLastCommand] = useState('');
   const [commandResult, setCommandResult] = useState('');
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [stockInput, setStockInput] = useState('');
+  const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognitionClass();
       
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'es-ES';
 
-      recognitionRef.current.onresult = (event) => {
+      recognitionRef.current.onresult = (event: any) => {
         let currentTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
@@ -42,7 +47,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         setTranscript(currentTranscript);
       };
 
-      recognitionRef.current.onerror = (event) => {
+      recognitionRef.current.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
         setIsListening(false);
         toast({
@@ -65,8 +70,22 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     };
   }, [setIsListening, toast]);
 
+  const searchProducts = (term: string) => {
+    if (!term.trim() || excelData.length === 0) {
+      setSearchResults([]);
+      return;
+    }
+
+    const results = excelData.filter(item => 
+      (item.Producto && item.Producto.toLowerCase().includes(term.toLowerCase())) ||
+      (item.Material && item.Material.toString().toLowerCase().includes(term.toLowerCase()))
+    );
+    
+    setSearchResults(results.slice(0, 10)); // Limitar a 10 resultados
+  };
+
   const processVoiceCommand = (command: string) => {
-    const lowerCommand = command.toLowerCase();
+    const lowerCommand = command.toLowerCase().trim();
     console.log('Processing voice command:', lowerCommand);
 
     if (excelData.length === 0) {
@@ -76,9 +95,21 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       return;
     }
 
-    // Comando para actualizar stock por voz
-    // Formato: "actualizar [producto] a [cantidad]" o "[producto] [cantidad]"
-    const updateRegex = /(?:actualizar\s+(.+?)\s+a\s+(\d+(?:[.,]\d+)?)|(.+?)\s+(\d+(?:[.,]\d+)?))/i;
+    // Primero buscar si es un comando de búsqueda
+    if (lowerCommand.includes('buscar') || lowerCommand.includes('encontrar')) {
+      const searchTerm = lowerCommand.replace(/buscar|encontrar/gi, '').trim();
+      if (searchTerm) {
+        setSearchTerm(searchTerm);
+        searchProducts(searchTerm);
+        const result = `Buscando productos con: ${searchTerm}`;
+        setCommandResult(result);
+        speak(result);
+      }
+      return;
+    }
+
+    // Comando para actualizar stock: "producto cantidad" o "actualizar producto a cantidad"
+    const updateRegex = /(?:actualizar\s+(.+?)\s+a\s+(\d+(?:[.,]\d+)?)|(.+?)\s+(\d+(?:[.,]\d+)?)$)/i;
     const match = lowerCommand.match(updateRegex);
     
     if (match) {
@@ -89,10 +120,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         const stock = parseFloat(stockValue);
         if (!isNaN(stock)) {
           // Buscar el producto más similar
-          const foundProduct = excelData.find(item => 
-            item.Producto.toLowerCase().includes(productName.toLowerCase()) ||
-            productName.toLowerCase().includes(item.Producto.toLowerCase().split(' ')[0])
-          );
+          const foundProduct = excelData.find(item => {
+            if (!item.Producto) return false;
+            const itemName = item.Producto.toLowerCase();
+            const searchName = productName.toLowerCase();
+            return itemName.includes(searchName) || searchName.includes(itemName.split(' ')[0]);
+          });
           
           if (foundProduct) {
             onUpdateStock(foundProduct.Producto, stock);
@@ -102,34 +135,26 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           } else {
             const result = `No se encontró el producto: ${productName}`;
             setCommandResult(result);
-            speak('Producto no encontrado');
+            speak('Producto no encontrado. Intenta usar el buscador.');
           }
           return;
         }
       }
     }
 
-    // Otros comandos de consulta
+    // Otros comandos
     if (lowerCommand.includes('cuántos productos') || lowerCommand.includes('total productos')) {
       const result = `Hay ${excelData.length} productos en el inventario`;
       setCommandResult(result);
       speak(result);
-    } else if (lowerCommand.includes('buscar') || lowerCommand.includes('encontrar')) {
-      const searchTerm = lowerCommand.split(/buscar|encontrar/)[1]?.trim();
-      if (searchTerm) {
-        const matches = excelData.filter(row => 
-          row.Producto.toLowerCase().includes(searchTerm)
-        );
-        const result = `Encontré ${matches.length} productos que contienen "${searchTerm}"`;
-        setCommandResult(result);
-        speak(result);
-      }
     } else if (lowerCommand.includes('limpiar') || lowerCommand.includes('borrar')) {
       setCommandResult('');
       setLastCommand('');
+      setSearchTerm('');
+      setSearchResults([]);
       speak('Pantalla limpiada');
     } else {
-      const result = 'Comando no reconocido. Prueba: "actualizar [producto] a [cantidad]" o "[producto] [cantidad]"';
+      const result = 'Comando no reconocido. Prueba: "buscar [producto]" o "[producto] [cantidad]"';
       setCommandResult(result);
       speak('Comando no reconocido');
     }
@@ -162,8 +187,106 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    searchProducts(value);
+  };
+
+  const selectProduct = (product: any) => {
+    setSelectedProduct(product);
+    setSearchResults([]);
+    setSearchTerm('');
+  };
+
+  const updateSelectedProductStock = () => {
+    if (selectedProduct && stockInput) {
+      const stock = parseFloat(stockInput.replace(',', '.'));
+      if (!isNaN(stock)) {
+        onUpdateStock(selectedProduct.Producto, stock);
+        const result = `Stock actualizado: ${selectedProduct.Producto} = ${stock.toFixed(1)}`;
+        setCommandResult(result);
+        speak(`Stock actualizado a ${stock.toFixed(1)}`);
+        setSelectedProduct(null);
+        setStockInput('');
+      }
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {/* Buscador de productos */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Buscador de Productos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Buscar por nombre o código de producto..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="pl-10"
+              />
+            </div>
+            
+            {searchResults.length > 0 && (
+              <div className="border rounded-lg max-h-60 overflow-y-auto">
+                {searchResults.map((product, index) => (
+                  <div
+                    key={index}
+                    className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                    onClick={() => selectProduct(product)}
+                  >
+                    <div className="font-medium">{product.Producto}</div>
+                    <div className="text-sm text-gray-500">
+                      Código: {product.Material} | Stock actual: {Number(product.Stock || 0).toFixed(1)} {product.UMB}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {selectedProduct && (
+              <Card className="border-green-200 bg-green-50">
+                <CardContent className="p-4">
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="font-medium">{selectedProduct.Producto}</h4>
+                      <p className="text-sm text-gray-600">
+                        Código: {selectedProduct.Material} | Unidad: {selectedProduct.UMB}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Stock actual: {Number(selectedProduct.Stock || 0).toFixed(1)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        placeholder="Nueva cantidad"
+                        value={stockInput}
+                        onChange={(e) => setStockInput(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button onClick={updateSelectedProductStock}>
+                        Actualizar
+                      </Button>
+                      <Button variant="outline" onClick={() => {setSelectedProduct(null); setStockInput('');}}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Controles de voz */}
       <div className="flex gap-4">
         <Button
           onClick={toggleListening}
@@ -237,15 +360,15 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </CardHeader>
         <CardContent>
           <ul className="text-sm text-gray-600 space-y-2">
-            <li><strong>• "Actualizar [producto] a [cantidad]"</strong> - Actualiza el stock de un producto</li>
-            <li><strong>• "[producto] [cantidad]"</strong> - Forma corta para actualizar stock</li>
+            <li><strong>• "Buscar [producto]"</strong> - Busca productos por nombre o código</li>
+            <li><strong>• "[producto] [cantidad]"</strong> - Actualiza stock directamente</li>
+            <li><strong>• "Actualizar [producto] a [cantidad]"</strong> - Forma larga para actualizar stock</li>
             <li>• "¿Cuántos productos hay?" - Cuenta total de productos</li>
-            <li>• "Buscar [término]" - Busca productos por nombre</li>
             <li>• "Limpiar pantalla" - Limpia los resultados</li>
           </ul>
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-700">
-              <strong>Ejemplos:</strong> "Actualizar leche a 5.5", "Pan 3.2", "Buscar aceite"
+              <strong>Ejemplos:</strong> "Buscar leche", "Leche 5.5", "Actualizar pan a 3.2"
             </p>
           </div>
         </CardContent>

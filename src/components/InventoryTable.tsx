@@ -65,61 +65,69 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
         <CardTitle>Inventario - {data.length} productos</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Producto</TableHead>
-              <TableHead>Precio</TableHead>
-              <TableHead className="w-32">Stock</TableHead>
-              <TableHead>Categoría</TableHead>
-              <TableHead className="w-24">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {data.map((row, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">{row.Producto}</TableCell>
-                <TableCell>{row.Precio}€</TableCell>
-                <TableCell>
-                  {editingIndex === index ? (
-                    <Input
-                      type="number"
-                      step="0.1"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={handleKeyPress}
-                      className="w-20"
-                      autoFocus
-                    />
-                  ) : (
-                    <span>{Number(row.Stock).toFixed(1)}</span>
-                  )}
-                </TableCell>
-                <TableCell>{row.Categoria}</TableCell>
-                <TableCell>
-                  {editingIndex === index ? (
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={saveEdit}>
-                        <Save className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={cancelEdit}>
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      onClick={() => startEdit(index, row.Stock)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  )}
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-24">Material</TableHead>
+                <TableHead className="min-w-[200px]">Producto</TableHead>
+                <TableHead className="w-20">UMB</TableHead>
+                <TableHead className="w-32">Stock</TableHead>
+                <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {data.map((row, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-mono text-sm">{row.Material}</TableCell>
+                  <TableCell className="font-medium max-w-[200px]">
+                    <div className="truncate" title={row.Producto}>
+                      {row.Producto}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">{row.UMB}</TableCell>
+                  <TableCell>
+                    {editingIndex === index ? (
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        className="w-20"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="font-mono">
+                        {Number(row.Stock || 0).toFixed(1)}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {editingIndex === index ? (
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={saveEdit}>
+                          <Save className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        onClick={() => startEdit(index, Number(row.Stock || 0))}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );

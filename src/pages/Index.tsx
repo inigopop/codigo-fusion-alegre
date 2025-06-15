@@ -14,22 +14,26 @@ const Index = () => {
   const [isListening, setIsListening] = useState(false);
 
   const handleDataProcessed = (data: any[], header: any, styles: any) => {
+    console.log('Data processed in Index:', data);
     setExcelData(data);
     setOriginalHeader(header);
     setOriginalStyles(styles);
   };
 
   const handleUpdateStock = (productNameOrIndex: string | number, newStock: number) => {
+    console.log('Updating stock:', productNameOrIndex, newStock);
     setExcelData(prevData => {
       return prevData.map((item, index) => {
         if (typeof productNameOrIndex === 'string') {
           // Actualización por nombre (comandos de voz)
-          if (item.Producto === productNameOrIndex) {
+          if (item.Producto && item.Producto === productNameOrIndex) {
+            console.log('Updated product by name:', item.Producto, 'to', newStock);
             return { ...item, Stock: newStock };
           }
         } else {
           // Actualización por índice (edición manual)
           if (index === productNameOrIndex) {
+            console.log('Updated product by index:', index, 'to', newStock);
             return { ...item, Stock: newStock };
           }
         }
@@ -71,7 +75,8 @@ const Index = () => {
               <CardHeader>
                 <CardTitle>Carga de Archivo del Economato</CardTitle>
                 <CardDescription>
-                  Importa el archivo Excel del economato. El encabezado se conservará automáticamente para la exportación.
+                  Importa el archivo Excel del economato. Las columnas deben ser: Material, Producto, UMB, Stock. 
+                  Solo la columna Stock es editable.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -97,7 +102,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle>Control por Voz del Inventario</CardTitle>
                 <CardDescription>
-                  Actualiza el stock de productos usando comandos de voz en español
+                  Usa el buscador para encontrar productos y actualiza el stock usando comandos de voz o manualmente
                 </CardDescription>
               </CardHeader>
               <CardContent>
