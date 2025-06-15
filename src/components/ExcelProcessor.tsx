@@ -32,35 +32,43 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         const worksheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[worksheetName];
         
-        console.log('=== NUEVO PROCESAMIENTO EXCEL ===');
+        console.log('=== PROCESANDO ARCHIVO ORIGINAL ===');
         
         // Convertir toda la hoja a JSON para ver la estructura real
         const allData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        console.log('Estructura completa del Excel:', allData.slice(0, 5));
+        console.log('Estructura completa del Excel:', allData.slice(0, 15));
         
-        // Encontrar la fila con los datos reales (saltar encabezados)
-        let startRow = 0;
+        // Buscar la fila de encabezados que contenga "MATERIAL", "PRODUCTO", etc.
+        let headerRowIndex = -1;
         for (let i = 0; i < allData.length; i++) {
           const row = allData[i] as any[];
-          // Buscar la primera fila que tenga un código de producto (números que empiecen por 1)
-          if (row && row[1] && typeof row[1] === 'string' && row[1].match(/^10\d+/)) {
-            startRow = i;
-            console.log('Datos encontrados en fila:', startRow);
+          if (row && row.some(cell => 
+            typeof cell === 'string' && 
+            (cell.includes('MATERIAL') || cell.includes('PRODUCTO') || cell.includes('UMB'))
+          )) {
+            headerRowIndex = i;
+            console.log('Encabezados encontrados en fila:', i, row);
             break;
           }
         }
         
-        // Procesar datos con el mapeo correcto basado en tu imagen
+        if (headerRowIndex === -1) {
+          throw new Error('No se encontraron los encabezados del inventario');
+        }
+
+        // Procesar datos desde la fila siguiente a los encabezados
         const processedData = [];
-        for (let i = startRow; i < allData.length; i++) {
+        for (let i = headerRowIndex + 1; i < allData.length; i++) {
           const row = allData[i] as any[];
-          if (row && row[1] && row[2]) { // Si tiene código de producto y descripción
+          
+          // Verificar que la fila tenga datos válidos
+          if (row && row[0] && row[1]) {
             const item = {
-              Material: row[0] || '', // Columna A (generalmente vacía)
-              Producto: row[2] || '', // Columna C contiene la descripción del producto
-              Codigo: row[1] || '',   // Columna B contiene el código
-              UMB: 'UN',             // Unidad por defecto
-              Stock: 0               // Stock inicial en 0
+              Material: String(row[0] || ''),        // Columna A: MATERIAL (código)
+              Producto: String(row[1] || ''),        // Columna B: PRODUCTO (descripción)
+              Codigo: String(row[0] || ''),          // Usar el material como código también
+              UMB: String(row[2] || 'UN'),          // Columna C: UMB (unidad)
+              Stock: Number(row[3]) || 0            // Columna D: STOCK (cantidad)
             };
             
             console.log(`Procesando fila ${i}:`, item);
@@ -68,20 +76,21 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
           }
         }
         
-        console.log('Datos procesados:', processedData.length, 'productos');
-        console.log('Muestra:', processedData.slice(0, 3));
+        console.log('✅ Datos procesados correctamente:', processedData.length, 'productos');
+        console.log('Muestra de productos:', processedData.slice(0, 3));
         
         onDataProcessed(processedData, {}, {}, file.name);
         
         toast({
-          title: "Archivo procesado correctamente",
+          title: "✅ Archivo procesado correctamente",
           description: `Se cargaron ${processedData.length} productos desde ${file.name}`,
         });
+        
       } catch (error) {
-        console.error('Error procesando Excel:', error);
+        console.error('❌ Error procesando Excel:', error);
         toast({
           title: "Error al procesar archivo",
-          description: "No se pudo procesar el archivo Excel. Verifica que sea válido.",
+          description: error instanceof Error ? error.message : "No se pudo procesar el archivo Excel",
           variant: "destructive",
         });
       } finally {
@@ -153,10 +162,10 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
               <Upload className="w-12 h-12 text-gray-400" />
               <div>
                 <p className="text-lg font-medium text-gray-700">
-                  {isDragActive ? 'Suelta el archivo aquí...' : 'Arrastra el archivo Excel del economato aquí'}
+                  {isDragActive ? 'Suelta el archivo aquí...' : 'Arrastra el archivo Excel del inventario aquí'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Detecta automáticamente: Código | Producto | Stock
+                  Estructura esperada: MATERIAL | PRODUCTO | UMB | STOCK
                 </p>
               </div>
               <Button 
