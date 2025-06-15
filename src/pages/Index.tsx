@@ -7,7 +7,7 @@ import VoiceCommands from "@/components/VoiceCommands";
 import InventoryTable from "@/components/InventoryTable";
 import { FileSpreadsheet, Mic, ClipboardList, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 
 const Index = () => {
   const [excelData, setExcelData] = useState<any[]>([]);
@@ -43,8 +43,8 @@ const Index = () => {
     });
   };
 
-  const exportExcel = () => {
-    console.log('=== EXPORTACIÓN CON ENCABEZADO PRINCIPAL Y ESTILOS ===');
+  const exportExcel = async () => {
+    console.log('=== EXPORTACIÓN CON EXCELJS ===');
     
     if (excelData.length === 0) {
       toast({
@@ -62,167 +62,127 @@ const Index = () => {
       const mesActual = meses[new Date().getMonth()];
       const tituloCompleto = `INVENTARIO BARES ${mesActual}`;
 
-      // Preparar datos con la estructura correcta
-      const exportData = excelData.map(item => ({
-        'MATERIAL': item.Material || '',
-        'PRODUCTO': item.Producto || '',
-        'UMB': item.UMB || 'UN',
-        'STOCK': Number(item.Stock) || 0
-      }));
+      // Crear workbook y worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Inventario');
 
-      console.log('Exportando', exportData.length, 'productos con encabezado principal');
+      // FILA 1: Título principal
+      worksheet.mergeCells('A1:D1');
+      const titleCell = worksheet.getCell('A1');
+      titleCell.value = tituloCompleto;
+      titleCell.font = { 
+        name: 'Arial', 
+        size: 45, 
+        bold: true,
+        color: { argb: 'FF000000' }
+      };
+      titleCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFFF00' } // Amarillo brillante
+      };
+      titleCell.alignment = { 
+        horizontal: 'center', 
+        vertical: 'middle' 
+      };
+      titleCell.border = {
+        top: { style: 'thin', color: { argb: 'FF000000' } },
+        left: { style: 'thin', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+        right: { style: 'thin', color: { argb: 'FF000000' } }
+      };
 
-      // Crear libro de trabajo
-      const wb = XLSX.utils.book_new();
-      
-      // Crear datos para la hoja
-      const wsData = [];
-      
-      // Fila 1: Encabezado principal
-      wsData.push([tituloCompleto, '', '', '']);
-      
-      // Fila 2: Vacía
-      wsData.push(['', '', '', '']);
-      
-      // Fila 3: Títulos de columnas
-      wsData.push(['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK']);
-      
-      // Filas de datos
-      exportData.forEach(item => {
-        wsData.push([item.MATERIAL, item.PRODUCTO, item.UMB, item.STOCK]);
+      // FILA 2: Vacía
+      worksheet.addRow(['', '', '', '']);
+
+      // FILA 3: Encabezados de columnas
+      const headerRow = worksheet.addRow(['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK']);
+      headerRow.eachCell((cell) => {
+        cell.font = { 
+          name: 'Arial', 
+          bold: true,
+          color: { argb: 'FF000000' }
+        };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFD3D3D3' } // Gris
+        };
+        cell.alignment = { 
+          horizontal: 'center', 
+          vertical: 'middle' 
+        };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF000000' } },
+          left: { style: 'thin', color: { argb: 'FF000000' } },
+          bottom: { style: 'thin', color: { argb: 'FF000000' } },
+          right: { style: 'thin', color: { argb: 'FF000000' } }
+        };
       });
 
-      // Crear la hoja de trabajo
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-      // MÉTODO MEJORADO PARA ESTILOS
-      // Definir estilos base
-      const yellowHeaderStyle = {
-        font: { 
-          bold: true, 
-          sz: 45, 
-          name: "Arial",
-          color: { rgb: "000000" } 
-        },
-        fill: { 
-          fgColor: { rgb: "FFFF05" },
-          patternType: "solid"
-        },
-        alignment: { 
-          horizontal: "center", 
-          vertical: "center"
-        },
-        border: {
-          top: { style: "thin", color: { rgb: "000000" } },
-          bottom: { style: "thin", color: { rgb: "000000" } },
-          left: { style: "thin", color: { rgb: "000000" } },
-          right: { style: "thin", color: { rgb: "000000" } }
-        }
-      };
-
-      const grayHeaderStyle = {
-        font: { 
-          bold: true, 
-          name: "Arial",
-          color: { rgb: "000000" } 
-        },
-        fill: { 
-          fgColor: { rgb: "D3D3D3" },
-          patternType: "solid"
-        },
-        alignment: { 
-          horizontal: "center", 
-          vertical: "center" 
-        },
-        border: {
-          top: { style: "thin", color: { rgb: "000000" } },
-          bottom: { style: "thin", color: { rgb: "000000" } },
-          left: { style: "thin", color: { rgb: "000000" } },
-          right: { style: "thin", color: { rgb: "000000" } }
-        }
-      };
-
-      const dataStyle = {
-        font: { name: "Arial" },
-        border: {
-          top: { style: "thin", color: { rgb: "000000" } },
-          bottom: { style: "thin", color: { rgb: "000000" } },
-          left: { style: "thin", color: { rgb: "000000" } },
-          right: { style: "thin", color: { rgb: "000000" } }
-        },
-        alignment: { 
-          horizontal: "center",
-          vertical: "center" 
-        }
-      };
-
-      // Asegurar que las celdas existen antes de aplicar estilos
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D1');
-
-      // Aplicar estilo al encabezado principal (A1) y extender a B1, C1, D1
-      for (let col = 0; col < 4; col++) {
-        const cellAddr = XLSX.utils.encode_cell({ r: 0, c: col });
-        if (!ws[cellAddr]) {
-          ws[cellAddr] = { v: col === 0 ? tituloCompleto : '', t: 's' };
-        }
-        ws[cellAddr].s = yellowHeaderStyle;
-      }
-
-      // Aplicar estilo a los títulos de columnas (fila 3)
-      const columnTitles = ['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK'];
-      for (let col = 0; col < 4; col++) {
-        const cellAddr = XLSX.utils.encode_cell({ r: 2, c: col });
-        if (!ws[cellAddr]) {
-          ws[cellAddr] = { v: columnTitles[col], t: 's' };
-        }
-        ws[cellAddr].s = grayHeaderStyle;
-      }
-
-      // Aplicar estilos a las celdas de datos
-      for (let row = 3; row < exportData.length + 3; row++) {
-        for (let col = 0; col < 4; col++) {
-          const cellAddr = XLSX.utils.encode_cell({ r: row, c: col });
-          if (ws[cellAddr]) {
-            ws[cellAddr].s = {
-              ...dataStyle,
-              alignment: { 
-                horizontal: col === 1 ? "left" : "center",
-                vertical: "center" 
-              }
-            };
-          }
-        }
-      }
-
-      // Combinar celdas para el título principal (A1:D1)
-      if (!ws['!merges']) ws['!merges'] = [];
-      ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
+      // FILAS DE DATOS
+      excelData.forEach(item => {
+        const dataRow = worksheet.addRow([
+          item.Material || '',
+          item.Producto || '',
+          item.UMB || 'UN',
+          Number(item.Stock) || 0
+        ]);
+        
+        dataRow.eachCell((cell, colNumber) => {
+          cell.font = { name: 'Arial' };
+          cell.alignment = { 
+            horizontal: colNumber === 2 ? 'left' : 'center', // Producto alineado a la izquierda
+            vertical: 'middle' 
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } }
+          };
+        });
+      });
 
       // Configurar anchos de columna
-      ws['!cols'] = [
-        { wch: 15 }, // MATERIAL
-        { wch: 40 }, // PRODUCTO
-        { wch: 8 },  // UMB
-        { wch: 12 }  // STOCK
-      ];
+      worksheet.getColumn('A').width = 15; // MATERIAL
+      worksheet.getColumn('B').width = 40; // PRODUCTO
+      worksheet.getColumn('C').width = 8;  // UMB
+      worksheet.getColumn('D').width = 12; // STOCK
 
-      // Configurar altura de filas
-      ws['!rows'] = [
-        { hpt: 60 }, // Encabezado principal (más alto)
-        { hpt: 10 }, // Fila vacía
-        { hpt: 25 }, // Títulos de columnas
-        ...Array(exportData.length).fill({ hpt: 20 }) // Filas de datos
-      ];
+      // Configurar alturas de fila
+      worksheet.getRow(1).height = 60; // Título principal
+      worksheet.getRow(2).height = 10; // Fila vacía
+      worksheet.getRow(3).height = 25; // Encabezados
+      
+      // Alturas para filas de datos
+      for (let i = 4; i <= excelData.length + 3; i++) {
+        worksheet.getRow(i).height = 20;
+      }
 
-      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
-
+      // Generar archivo
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      
       const exportFileName = `${fileName.replace(/\.[^/.]+$/, "") || "inventario"}_actualizado.xlsx`;
       
-      XLSX.writeFile(wb, exportFileName);
+      // Descargar archivo
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = exportFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log('✅ Archivo generado con ExcelJS');
 
       toast({
         title: "✅ Archivo exportado correctamente",
-        description: `${exportFileName} con encabezado "${tituloCompleto}" y ${exportData.length} productos`,
+        description: `${exportFileName} con formato profesional y ${excelData.length} productos`,
       });
 
     } catch (error) {
