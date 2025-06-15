@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import * as XLSX from 'xlsx';
@@ -33,43 +32,53 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         const worksheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[worksheetName];
         
-        console.log('Processing Excel file...');
+        console.log('=== NUEVO PROCESAMIENTO EXCEL ===');
         
-        // Guardar la hoja completa con estilos para exportación
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-        const originalHeader: any = {};
-        const originalStyles: any = {};
+        // Convertir toda la hoja a JSON para ver la estructura real
+        const allData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        console.log('Estructura completa del Excel:', allData.slice(0, 5));
         
-        // Capturar encabezado original y estilos de la primera fila
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-          const cell = worksheet[cellAddress];
-          if (cell) {
-            const colLetter = XLSX.utils.encode_col(col);
-            originalHeader[colLetter] = cell.v;
-            originalStyles[cellAddress] = cell.s || {};
-            console.log(`Header ${colLetter}: ${cell.v}`);
+        // Encontrar la fila con los datos reales (saltar encabezados)
+        let startRow = 0;
+        for (let i = 0; i < allData.length; i++) {
+          const row = allData[i] as any[];
+          // Buscar la primera fila que tenga un código de producto (números que empiecen por 1)
+          if (row && row[1] && typeof row[1] === 'string' && row[1].match(/^10\d+/)) {
+            startRow = i;
+            console.log('Datos encontrados en fila:', startRow);
+            break;
           }
         }
         
-        // Convertir datos empezando desde la fila 2
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-          range: 1,
-          header: ['Material', 'Producto', 'UMB', 'Stock'],
-          defval: ''
-        });
+        // Procesar datos con el mapeo correcto basado en tu imagen
+        const processedData = [];
+        for (let i = startRow; i < allData.length; i++) {
+          const row = allData[i] as any[];
+          if (row && row[1] && row[2]) { // Si tiene código de producto y descripción
+            const item = {
+              Material: row[0] || '', // Columna A (generalmente vacía)
+              Producto: row[2] || '', // Columna C contiene la descripción del producto
+              Codigo: row[1] || '',   // Columna B contiene el código
+              UMB: 'UN',             // Unidad por defecto
+              Stock: 0               // Stock inicial en 0
+            };
+            
+            console.log(`Procesando fila ${i}:`, item);
+            processedData.push(item);
+          }
+        }
         
-        console.log('Excel data processed:', jsonData.length, 'rows');
-        console.log('Original header captured:', originalHeader);
+        console.log('Datos procesados:', processedData.length, 'productos');
+        console.log('Muestra:', processedData.slice(0, 3));
         
-        onDataProcessed(jsonData, originalHeader, originalStyles, file.name);
+        onDataProcessed(processedData, {}, {}, file.name);
         
         toast({
-          title: "Archivo procesado exitosamente",
-          description: `Se cargaron ${jsonData.length} registros desde ${file.name}`,
+          title: "Archivo procesado correctamente",
+          description: `Se cargaron ${processedData.length} productos desde ${file.name}`,
         });
       } catch (error) {
-        console.error('Error processing Excel file:', error);
+        console.error('Error procesando Excel:', error);
         toast({
           title: "Error al procesar archivo",
           description: "No se pudo procesar el archivo Excel. Verifica que sea válido.",
@@ -105,7 +114,6 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
     if (file) {
       processExcelFile(file);
     }
-    // Limpiar el input para permitir seleccionar el mismo archivo otra vez
     event.target.value = '';
   };
 
@@ -120,7 +128,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
       'text/csv': ['.csv']
     },
     multiple: false,
-    noClick: true // Desactivar click en la zona de drop para que solo funcione nuestro botón
+    noClick: true
   });
 
   return (
@@ -148,7 +156,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
                   {isDragActive ? 'Suelta el archivo aquí...' : 'Arrastra el archivo Excel del economato aquí'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  o haz clic para seleccionar. Formatos: .xlsx, .xls, .csv
+                  Detecta automáticamente: Código | Producto | Stock
                 </p>
               </div>
               <Button 

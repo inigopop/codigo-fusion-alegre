@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,11 +19,8 @@ const Index = () => {
   const { toast } = useToast();
 
   const handleDataProcessed = (data: any[], header: any, styles: any, filename?: string) => {
-    console.log('=== DATA PROCESSED DEBUG ===');
-    console.log('Datos recibidos:', data.length, 'filas');
-    console.log('Muestra de datos:', data.slice(0, 3));
-    console.log('Header original:', header);
-    console.log('Filename:', filename);
+    console.log('Datos procesados:', data.length, 'productos');
+    console.log('Muestra:', data.slice(0, 3));
     
     setExcelData(data);
     setOriginalHeader(header);
@@ -32,43 +30,25 @@ const Index = () => {
     }
   };
 
-  const handleUpdateStock = (productNameOrIndex: string | number, newStock: number) => {
-    console.log('=== UPDATE STOCK DEBUG ===');
-    console.log('Parámetros:', { productNameOrIndex, newStock });
-    console.log('Tipo de identificador:', typeof productNameOrIndex);
+  const handleUpdateStock = (productName: string, newStock: number) => {
+    console.log('Actualizando stock:', productName, newStock);
     
     setExcelData(prevData => {
-      console.log('Datos previos:', prevData.length);
-      
-      const newData = prevData.map((item, index) => {
-        if (typeof productNameOrIndex === 'string') {
-          if (item.Producto && item.Producto === productNameOrIndex) {
-            console.log('Stock actualizado por nombre:', item.Producto, newStock);
-            return { ...item, Stock: newStock };
-          }
-        } else {
-          if (index === productNameOrIndex) {
-            console.log('Stock actualizado por índice:', index, newStock);
-            return { ...item, Stock: newStock };
-          }
+      return prevData.map(item => {
+        if (item && item.Producto === productName) {
+          console.log('Stock actualizado:', productName, newStock);
+          return { ...item, Stock: newStock };
         }
         return item;
       });
-      
-      console.log('Datos actualizados:', newData.length);
-      return newData;
     });
   };
 
-  // Función de exportación con logs detallados
+  // Función de exportación simplificada
   const exportExcel = () => {
-    console.log('=== EXPORT DEBUG ===');
-    console.log('Iniciando exportación...');
-    console.log('Datos totales:', excelData.length);
-    console.log('Nombre de archivo base:', fileName);
-
+    console.log('=== EXPORTACIÓN SIMPLIFICADA ===');
+    
     if (excelData.length === 0) {
-      console.log('No hay datos para exportar');
       toast({
         title: "No hay datos para exportar",
         description: "Carga un archivo Excel primero",
@@ -78,93 +58,45 @@ const Index = () => {
     }
 
     try {
-      console.log('Filtrando datos válidos...');
-      
-      // Log de todos los productos para ver qué se está filtrando
-      excelData.forEach((item, index) => {
-        console.log(`Item ${index}:`, {
-          completo: item,
-          producto: item?.Producto,
-          tipoProducto: typeof item?.Producto,
-          material: item?.Material,
-          umb: item?.UMB,
-          stock: item?.Stock
-        });
-      });
+      // Datos para exportar - estructura simple
+      const exportData = excelData.map(item => ({
+        'MATERIAL': item.Material || '',
+        'CODIGO': item.Codigo || '',
+        'PRODUCTO': item.Producto || '',
+        'UMB': item.UMB || 'UN',
+        'STOCK': Number(item.Stock) || 0
+      }));
 
-      // Filtrado muy simple
-      const validData = excelData.filter((item, index) => {
-        const isValid = item && item.Producto && typeof item.Producto === 'string' && item.Producto.trim() !== '';
-        console.log(`Validación ${index}: ${isValid}`);
-        return isValid;
-      });
+      console.log('Exportando', exportData.length, 'productos');
 
-      console.log('Productos válidos:', validData.length);
-
-      if (validData.length === 0) {
-        console.error('No se encontraron productos válidos');
-        toast({
-          title: "Error",
-          description: "No se encontraron productos válidos para exportar",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Crear datos de exportación simples
-      const exportData = validData.map((item, index) => {
-        const exportItem = {
-          'MATERIAL': item.Material || '',
-          'PRODUCTO': item.Producto || '',
-          'UMB': item.UMB || '',
-          'STOCK': Number(item.Stock) || 0
-        };
-        console.log(`Export item ${index}:`, exportItem);
-        return exportItem;
-      });
-
-      console.log('Datos preparados:', exportData.length);
-      console.log('Muestra de datos exportación:', exportData.slice(0, 3));
-
-      // Crear workbook simple
-      console.log('Creando worksheet...');
+      // Crear hoja de cálculo
       const ws = XLSX.utils.json_to_sheet(exportData);
-      
-      console.log('Creando workbook...');
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
 
-      // Configuración simple de columnas
+      // Configurar anchos de columna
       ws['!cols'] = [
-        { wch: 15 },
-        { wch: 40 },
-        { wch: 10 },
-        { wch: 15 }
+        { wch: 12 }, // MATERIAL
+        { wch: 12 }, // CODIGO  
+        { wch: 35 }, // PRODUCTO
+        { wch: 8 },  // UMB
+        { wch: 10 }  // STOCK
       ];
 
-      // Nombre del archivo
-      const baseFileName = fileName.replace(/\.[^/.]+$/, "") || "inventario";
-      const exportFileName = `${baseFileName}_actualizado.xlsx`;
+      const exportFileName = `${fileName.replace(/\.[^/.]+$/, "") || "inventario"}_actualizado.xlsx`;
       
-      console.log('Nombre de exportación:', exportFileName);
-      console.log('Iniciando descarga...');
-
-      // Exportar
       XLSX.writeFile(wb, exportFileName);
 
-      console.log('Exportación completada exitosamente');
-
       toast({
-        title: "Archivo exportado",
-        description: `${exportFileName} descargado con ${validData.length} productos`,
+        title: "✅ Archivo exportado correctamente",
+        description: `${exportFileName} con ${exportData.length} productos`,
       });
 
     } catch (error) {
-      console.error('Error detallado en exportación:', error);
-      console.error('Stack trace:', error.stack);
+      console.error('Error en exportación:', error);
       toast({
         title: "Error al exportar",
-        description: `Error: ${error.message}`,
+        description: "Hubo un problema al generar el archivo",
         variant: "destructive",
       });
     }
@@ -182,14 +114,14 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Debug panel */}
-        <Card className="mb-6 border-red-200 bg-red-50">
+        {/* Estado del sistema */}
+        <Card className="mb-6 border-green-200 bg-green-50">
           <CardContent className="p-4">
-            <h3 className="font-medium text-red-700 mb-2">Panel de Debug:</h3>
-            <div className="grid grid-cols-3 gap-4 text-sm text-red-600">
-              <div>Datos cargados: {excelData.length}</div>
-              <div>Archivo: {fileName || 'No cargado'}</div>
-              <div>Navegador: {navigator.userAgent.split(' ')[0]}</div>
+            <h3 className="font-medium text-green-700 mb-2">📊 Estado del Sistema:</h3>
+            <div className="grid grid-cols-3 gap-4 text-sm text-green-600">
+              <div>✅ Productos: {excelData.length}</div>
+              <div>📁 Archivo: {fileName || 'No cargado'}</div>
+              <div>🎤 Voz: {isListening ? 'Activo' : 'Inactivo'}</div>
             </div>
           </CardContent>
         </Card>
@@ -202,7 +134,7 @@ const Index = () => {
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
             >
               <Download className="w-5 h-5" />
-              Exportar Inventario ({excelData.length} productos)
+              📥 Exportar Excel ({excelData.length} productos)
             </Button>
           </div>
         )}
@@ -228,7 +160,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle>Carga de Archivo del Economato</CardTitle>
                 <CardDescription>
-                  Importa el archivo Excel del economato con las columnas: Material, Producto, UMB, Stock.
+                  Importa el archivo Excel. Detecta automáticamente: Material | Código | Producto | Stock
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -245,7 +177,12 @@ const Index = () => {
           <TabsContent value="inventory">
             <InventoryTable 
               data={excelData}
-              onUpdateStock={handleUpdateStock}
+              onUpdateStock={(index, newStock) => {
+                const product = excelData[index];
+                if (product) {
+                  handleUpdateStock(product.Producto, newStock);
+                }
+              }}
             />
           </TabsContent>
 
