@@ -14,14 +14,17 @@ const Index = () => {
   const [excelData, setExcelData] = useState<any[]>([]);
   const [originalHeader, setOriginalHeader] = useState<any>({});
   const [originalStyles, setOriginalStyles] = useState<any>({});
-  const [originalWorksheet, setOriginalWorksheet] = useState<any>(null);
   const [fileName, setFileName] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
   const { toast } = useToast();
 
   const handleDataProcessed = (data: any[], header: any, styles: any, filename?: string) => {
-    console.log('Data processed in Index:', data.length, 'items');
+    console.log('=== DATA PROCESSED IN INDEX ===');
+    console.log('Data length:', data.length);
+    console.log('Sample data:', data[0]);
     console.log('Original header:', header);
+    console.log('Filename:', filename);
+    
     setExcelData(data);
     setOriginalHeader(header);
     setOriginalStyles(styles);
@@ -31,26 +34,39 @@ const Index = () => {
   };
 
   const handleUpdateStock = (productNameOrIndex: string | number, newStock: number) => {
-    console.log('Updating stock:', productNameOrIndex, newStock);
+    console.log('=== UPDATE STOCK DEBUG ===');
+    console.log('Product identifier:', productNameOrIndex);
+    console.log('New stock:', newStock);
+    console.log('Current data length:', excelData.length);
+    
     setExcelData(prevData => {
-      return prevData.map((item, index) => {
+      const newData = prevData.map((item, index) => {
         if (typeof productNameOrIndex === 'string') {
           if (item.Producto && item.Producto === productNameOrIndex) {
-            console.log('Updated product by name:', item.Producto, 'to', newStock);
+            console.log('Updated product by name:', item.Producto, 'from', item.Stock, 'to', newStock);
             return { ...item, Stock: newStock };
           }
         } else {
           if (index === productNameOrIndex) {
-            console.log('Updated product by index:', index, 'to', newStock);
+            console.log('Updated product by index:', index, 'from', item.Stock, 'to', newStock);
             return { ...item, Stock: newStock };
           }
         }
         return item;
       });
+      
+      console.log('Data after update:', newData.length);
+      return newData;
     });
   };
 
   const exportExcel = () => {
+    console.log('=== EXPORT DEBUG ===');
+    console.log('Excel data length:', excelData.length);
+    console.log('Original header:', originalHeader);
+    console.log('Original styles:', originalStyles);
+    console.log('Sample data item:', excelData[0]);
+
     if (excelData.length === 0) {
       toast({
         title: "No hay datos para exportar",
@@ -61,30 +77,17 @@ const Index = () => {
     }
 
     try {
-      console.log('Starting export...');
-      console.log('Excel data length:', excelData.length);
-      console.log('Original header:', originalHeader);
-      
+      // Crear libro de trabajo
       const wb = XLSX.utils.book_new();
       
-      // Crear una matriz con el encabezado original y los datos actualizados
-      const exportData = [];
+      // Preparar los datos manteniendo la estructura original
+      const exportData: any[][] = [];
       
-      // Primera fila: encabezado original
-      const headerRow = [];
-      if (Object.keys(originalHeader).length > 0) {
-        // Usar el encabezado original en el orden correcto
-        const columnOrder = ['A', 'B', 'C', 'D'];
-        for (const col of columnOrder) {
-          headerRow.push(originalHeader[col] || '');
-        }
-      } else {
-        // Encabezado por defecto si no hay original
-        headerRow.push('MATERIAL', 'PRODUCTO', 'UMB', 'STOCK');
-      }
-      exportData.push(headerRow);
+      // Fila de encabezado - usar el encabezado original o uno por defecto
+      const headers = ['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK'];
+      exportData.push(headers);
       
-      // Añadir los datos del inventario
+      // Añadir datos
       excelData.forEach(item => {
         exportData.push([
           item.Material || '',
@@ -95,86 +98,78 @@ const Index = () => {
       });
       
       console.log('Export data prepared:', exportData.length, 'rows');
-      console.log('Header row:', exportData[0]);
-      console.log('Sample data row:', exportData[1]);
+      console.log('Headers:', exportData[0]);
+      console.log('Sample row:', exportData[1]);
       
-      // Crear la hoja de trabajo
+      // Crear hoja de trabajo
       const ws = XLSX.utils.aoa_to_sheet(exportData);
       
-      // Establecer el rango de la hoja
+      // Configurar el rango
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      console.log('Sheet range:', range);
       
-      // Aplicar estilos al encabezado
+      // Aplicar formato a los encabezados
       for (let col = range.s.c; col <= range.e.c; col++) {
         const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-        
         if (!ws[cellAddress]) {
-          ws[cellAddress] = { v: '', t: 's' };
+          ws[cellAddress] = { v: headers[col], t: 's' };
         }
         
-        // Aplicar estilos del encabezado original si existen
-        const originalCellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-        if (originalStyles[originalCellAddress]) {
-          ws[cellAddress].s = originalStyles[originalCellAddress];
-        } else {
-          // Estilo por defecto para el encabezado
-          ws[cellAddress].s = {
-            fill: { fgColor: { rgb: "CCCCCC" } },
-            font: { bold: true, color: { rgb: "000000" } },
-            alignment: { horizontal: "center", vertical: "center" },
-            border: {
-              top: { style: "thin", color: { rgb: "000000" } },
-              bottom: { style: "thin", color: { rgb: "000000" } },
-              left: { style: "thin", color: { rgb: "000000" } },
-              right: { style: "thin", color: { rgb: "000000" } }
-            }
-          };
-        }
+        // Aplicar estilo de encabezado
+        ws[cellAddress].s = {
+          fill: { fgColor: { rgb: "366092" } },
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          }
+        };
       }
       
       // Configurar anchos de columna
-      const colWidths = [
-        { wch: 12 }, // Material
-        { wch: 40 }, // Producto (más ancho para nombres largos)
-        { wch: 8 },  // UMB
-        { wch: 12 }  // Stock
+      ws['!cols'] = [
+        { wch: 15 }, // Material
+        { wch: 50 }, // Producto 
+        { wch: 10 }, // UMB
+        { wch: 15 }  // Stock
       ];
-      ws['!cols'] = colWidths;
       
-      // Aplicar formato a las celdas de datos
+      // Aplicar bordes a todas las celdas de datos
       for (let row = 1; row <= range.e.r; row++) {
         for (let col = range.s.c; col <= range.e.c; col++) {
           const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
           if (!ws[cellAddress]) continue;
           
-          // Formato específico para la columna de stock (números)
-          if (col === 3) { // Columna D (Stock)
-            ws[cellAddress].t = 'n'; // Tipo numérico
+          // Asegurar que la columna de stock sea numérica
+          if (col === 3 && ws[cellAddress]) { // Columna D (Stock)
+            ws[cellAddress].t = 'n';
             if (typeof ws[cellAddress].v === 'string') {
               ws[cellAddress].v = parseFloat(ws[cellAddress].v) || 0;
             }
           }
           
-          // Bordes para todas las celdas
-          ws[cellAddress].s = {
-            ...ws[cellAddress].s,
-            border: {
-              top: { style: "thin", color: { rgb: "000000" } },
-              bottom: { style: "thin", color: { rgb: "000000" } },
-              left: { style: "thin", color: { rgb: "000000" } },
-              right: { style: "thin", color: { rgb: "000000" } }
-            }
+          // Aplicar bordes
+          if (!ws[cellAddress].s) ws[cellAddress].s = {};
+          ws[cellAddress].s.border = {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
           };
         }
       }
       
-      // Añadir la hoja al libro
+      // Añadir hoja al libro
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
       
       // Generar nombre del archivo
-      const exportFileName = (fileName || "inventario").replace(/\.[^/.]+$/, "") + "_inventario_actualizado.xlsx";
+      const baseFileName = fileName.replace(/\.[^/.]+$/, "") || "inventario";
+      const exportFileName = `${baseFileName}_actualizado.xlsx`;
       
-      // Exportar el archivo
+      // Exportar
       XLSX.writeFile(wb, exportFileName);
       
       console.log('Export completed successfully');
@@ -241,15 +236,12 @@ const Index = () => {
               <CardHeader>
                 <CardTitle>Carga de Archivo del Economato</CardTitle>
                 <CardDescription>
-                  Importa el archivo Excel del economato. Las columnas deben ser: Material, Producto, UMB, Stock. 
-                  Solo la columna Stock es editable.
+                  Importa el archivo Excel del economato. Las columnas deben ser: Material, Producto, UMB, Stock.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ExcelProcessor 
-                  onDataProcessed={(data, header, styles, filename) => {
-                    handleDataProcessed(data, header, styles, filename);
-                  }}
+                  onDataProcessed={handleDataProcessed}
                   existingData={excelData}
                   originalHeader={originalHeader}
                   originalStyles={originalStyles}
@@ -270,7 +262,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle>Control por Voz del Inventario</CardTitle>
                 <CardDescription>
-                  Usa el buscador para encontrar productos y actualiza el stock usando comandos de voz o manualmente
+                  Usa el buscador para encontrar productos y actualiza el stock usando comandos de voz
                 </CardDescription>
               </CardHeader>
               <CardContent>
