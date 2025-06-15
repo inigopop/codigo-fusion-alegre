@@ -95,12 +95,9 @@ const Index = () => {
       // Crear la hoja de trabajo
       const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-      // Configurar celdas individuales con estilos
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D1');
-
-      // Estilo del encabezado principal (A1) - Fondo amarillo
-      if (!ws['A1']) ws['A1'] = { v: tituloCompleto, t: 's' };
-      ws['A1'].s = {
+      // MÉTODO MEJORADO PARA ESTILOS
+      // Definir estilos base
+      const yellowHeaderStyle = {
         font: { 
           bold: true, 
           sz: 45, 
@@ -113,8 +110,7 @@ const Index = () => {
         },
         alignment: { 
           horizontal: "center", 
-          vertical: "center",
-          wrapText: false
+          vertical: "center"
         },
         border: {
           top: { style: "thin", color: { rgb: "000000" } },
@@ -124,74 +120,83 @@ const Index = () => {
         }
       };
 
-      // Aplicar el mismo estilo a las celdas B1, C1, D1 para el merge
-      ['B1', 'C1', 'D1'].forEach(cellAddr => {
-        if (!ws[cellAddr]) ws[cellAddr] = { v: '', t: 's' };
-        ws[cellAddr].s = {
-          fill: { 
-            fgColor: { rgb: "FFFF05" },
-            patternType: "solid"
-          },
-          border: {
-            top: { style: "thin", color: { rgb: "000000" } },
-            bottom: { style: "thin", color: { rgb: "000000" } },
-            left: { style: "thin", color: { rgb: "000000" } },
-            right: { style: "thin", color: { rgb: "000000" } }
-          }
-        };
-      });
-
-      // Estilos para los títulos de columnas (fila 3) - Fondo gris
-      ['A3', 'B3', 'C3', 'D3'].forEach(cellAddr => {
-        if (ws[cellAddr]) {
-          ws[cellAddr].s = {
-            font: { 
-              bold: true, 
-              name: "Arial",
-              color: { rgb: "000000" } 
-            },
-            fill: { 
-              fgColor: { rgb: "D3D3D3" },
-              patternType: "solid"
-            },
-            alignment: { 
-              horizontal: "center", 
-              vertical: "center" 
-            },
-            border: {
-              top: { style: "thin", color: { rgb: "000000" } },
-              bottom: { style: "thin", color: { rgb: "000000" } },
-              left: { style: "thin", color: { rgb: "000000" } },
-              right: { style: "thin", color: { rgb: "000000" } }
-            }
-          };
+      const grayHeaderStyle = {
+        font: { 
+          bold: true, 
+          name: "Arial",
+          color: { rgb: "000000" } 
+        },
+        fill: { 
+          fgColor: { rgb: "D3D3D3" },
+          patternType: "solid"
+        },
+        alignment: { 
+          horizontal: "center", 
+          vertical: "center" 
+        },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
         }
-      });
+      };
 
-      // Estilos para las celdas de datos (desde fila 4)
-      for (let row = 4; row <= exportData.length + 3; row++) {
-        ['A', 'B', 'C', 'D'].forEach((col, colIndex) => {
-          const cellAddr = `${col}${row}`;
+      const dataStyle = {
+        font: { name: "Arial" },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        },
+        alignment: { 
+          horizontal: "center",
+          vertical: "center" 
+        }
+      };
+
+      // Asegurar que las celdas existen antes de aplicar estilos
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D1');
+
+      // Aplicar estilo al encabezado principal (A1) y extender a B1, C1, D1
+      for (let col = 0; col < 4; col++) {
+        const cellAddr = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!ws[cellAddr]) {
+          ws[cellAddr] = { v: col === 0 ? tituloCompleto : '', t: 's' };
+        }
+        ws[cellAddr].s = yellowHeaderStyle;
+      }
+
+      // Aplicar estilo a los títulos de columnas (fila 3)
+      const columnTitles = ['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK'];
+      for (let col = 0; col < 4; col++) {
+        const cellAddr = XLSX.utils.encode_cell({ r: 2, c: col });
+        if (!ws[cellAddr]) {
+          ws[cellAddr] = { v: columnTitles[col], t: 's' };
+        }
+        ws[cellAddr].s = grayHeaderStyle;
+      }
+
+      // Aplicar estilos a las celdas de datos
+      for (let row = 3; row < exportData.length + 3; row++) {
+        for (let col = 0; col < 4; col++) {
+          const cellAddr = XLSX.utils.encode_cell({ r: row, c: col });
           if (ws[cellAddr]) {
             ws[cellAddr].s = {
-              font: { name: "Arial" },
-              border: {
-                top: { style: "thin", color: { rgb: "000000" } },
-                bottom: { style: "thin", color: { rgb: "000000" } },
-                left: { style: "thin", color: { rgb: "000000" } },
-                right: { style: "thin", color: { rgb: "000000" } }
-              },
+              ...dataStyle,
               alignment: { 
-                horizontal: colIndex === 1 ? "left" : "center",
+                horizontal: col === 1 ? "left" : "center",
                 vertical: "center" 
               }
             };
           }
-        });
+        }
       }
 
       // Combinar celdas para el título principal (A1:D1)
-      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+      if (!ws['!merges']) ws['!merges'] = [];
+      ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
 
       // Configurar anchos de columna
       ws['!cols'] = [
@@ -208,9 +213,6 @@ const Index = () => {
         { hpt: 25 }, // Títulos de columnas
         ...Array(exportData.length).fill({ hpt: 20 }) // Filas de datos
       ];
-
-      // Configurar rango de la hoja
-      ws['!ref'] = `A1:D${exportData.length + 3}`;
 
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
 
