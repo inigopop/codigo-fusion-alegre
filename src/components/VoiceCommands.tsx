@@ -27,6 +27,33 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const restartTimeoutRef = useRef<any>(null);
   const { toast } = useToast();
 
+  // Función para limpiar el estado y detener el reconocimiento completamente
+  const forceStopRecognition = () => {
+    console.log('🛑 Forzando detención completa del reconocimiento');
+    
+    // Limpiar timeout de reinicio
+    if (restartTimeoutRef.current) {
+      clearTimeout(restartTimeoutRef.current);
+      restartTimeoutRef.current = null;
+    }
+    
+    // Detener reconocimiento si existe
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.log('Error deteniendo reconocimiento:', error);
+      }
+    }
+    
+    // Resetear todos los estados
+    setIsListening(false);
+    setIsProcessing(false);
+    setTranscript('');
+    setInterimTranscript('');
+    setConfidence(0);
+  };
+
   // Búsqueda inteligente mejorada
   const searchProducts = (term: string) => {
     if (!term.trim() || !excelData || excelData.length === 0) {
@@ -70,6 +97,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         console.log('🎤 Reconocimiento iniciado');
         setTranscript('');
         setInterimTranscript('');
+        setIsProcessing(false);
       };
 
       recognitionRef.current.onresult = (event: any) => {
@@ -107,6 +135,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       recognitionRef.current.onerror = (event: any) => {
         console.error('❌ Error reconocimiento:', event.error);
         
+        // Detener procesamiento en caso de error
+        setIsProcessing(false);
+        
         if (event.error === 'no-speech') {
           toast({
             title: "No se detectó voz",
@@ -119,40 +150,49 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             description: "Verifica tu conexión a internet",
             variant: "destructive",
           });
+        } else if (event.error === 'aborted') {
+          console.log('Reconocimiento abortado por el usuario');
+        } else {
+          toast({
+            title: "Error de reconocimiento",
+            description: `Error: ${event.error}`,
+            variant: "destructive",
+          });
         }
         
-        setIsListening(false);
-        setIsProcessing(false);
+        // Forzar detención completa en caso de error crítico
+        forceStopRecognition();
       };
 
       recognitionRef.current.onend = () => {
         console.log('🔚 Reconocimiento terminado');
-        setIsListening(false);
         setIsProcessing(false);
         setInterimTranscript('');
         
-        // Auto-restart si estaba escuchando
-        if (isListening) {
+        // Solo reiniciar si todavía estamos en modo escucha
+        if (isListening && recognitionRef.current) {
           restartTimeoutRef.current = setTimeout(() => {
             if (recognitionRef.current && isListening) {
               try {
                 recognitionRef.current.start();
-                setIsListening(true);
+                console.log('🔄 Reconocimiento reiniciado automáticamente');
               } catch (error) {
                 console.error('Error al reiniciar:', error);
+                forceStopRecognition();
               }
             }
           }, 100);
+        } else {
+          setIsListening(false);
         }
       };
     }
 
+    // Cleanup al desmontar
     return () => {
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
+      forceStopRecognition();
     };
-  }, [setIsListening, isListening]);
+  }, [isListening, setIsListening]);
 
   // Procesamiento inteligente de comandos
   const processVoiceCommand = async (command: string, confidence: number) => {
@@ -291,17 +331,18 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
 
     if (isListening) {
-      recognitionRef.current.stop();
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
+      // Detener completamente
+      forceStopRecognition();
+      speak('Reconocimiento de voz desactivado');
     } else {
+      // Iniciar
       try {
         recognitionRef.current.start();
         setIsListening(true);
         speak('Reconocimiento de voz activado');
       } catch (error) {
         console.error('Error iniciando reconocimiento:', error);
+        forceStopRecognition();
         toast({
           title: "Error",
           description: "No se pudo iniciar el reconocimiento de voz",
@@ -354,7 +395,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                 <p>Disponible: {recognitionRef.current ? '✅' : '❌'}</p>
                 <p>Estado: {isListening ? '🎤 Escuchando' : '⏸️ Inactivo'}</p>
                 {confidence > 0 && (
-                  <p>Confianza: <Badge variant={confidence > 0.7 ? 'default' : 'secondary'}>{Math.round(confidence * 100)}%</Badge></p>
+                  <div>Confianza: <Badge variant={confidence > 0.7 ? 'default' : 'secondary'}>{Math.round(confidence * 100)}%</Badge></div>
                 )}
               </div>
             </div>
@@ -545,6 +586,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                 <li>• Evita ruido de fondo</li>
                 <li>• Usa nombres de productos simplificados</li>
                 <li>• Espera a que termine de procesar antes del siguiente comando</li>
+                <li>• Si falla, usa el botón "Detener Escucha" y vuelve a empezar</li>
               </ul>
             </div>
           </div>
