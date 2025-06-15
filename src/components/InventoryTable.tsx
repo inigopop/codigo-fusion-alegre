@@ -28,43 +28,65 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función para obtener el código del material - CORREGIDA PARA USAR CÓDIGOS REALES
+  // Función para obtener el código del material - MEJORADA PARA CÓDIGOS DE 7 DÍGITOS
   const getMaterialCode = useCallback((product: any) => {
-    console.log('🔍 Buscando código en producto:', product);
+    console.log('🔍 BUSCANDO CÓDIGO DE 7 DÍGITOS:', product);
+    console.log('🔍 Todos los campos:', Object.keys(product));
+    console.log('🔍 Valores de campos clave:', {
+      Material: product.Material,
+      Codigo: product.Codigo,
+      MATERIAL: product.MATERIAL,
+      CODIGO: product.CODIGO
+    });
     
-    // PRIORIDAD 1: Usar el campo Material si es un código numérico válido
-    if (product.Material && typeof product.Material === 'string') {
-      const materialValue = product.Material.trim();
-      if (/^\d{7}$/.test(materialValue)) { // Códigos de 7 dígitos como en el Excel
-        console.log('✅ Código real encontrado en Material:', materialValue);
-        return materialValue;
-      }
-    }
+    // Lista de todos los campos posibles donde puede estar el código
+    const possibleCodeFields = [
+      'Material', 'MATERIAL', 'material',
+      'Codigo', 'CODIGO', 'codigo', 
+      'Code', 'CODE', 'code',
+      'SKU', 'sku', 'Sku',
+      'ID', 'id', 'Id'
+    ];
     
-    // PRIORIDAD 2: Usar el campo Codigo si es un código numérico válido
-    if (product.Codigo && typeof product.Codigo === 'string') {
-      const codigoValue = product.Codigo.trim();
-      if (/^\d{7}$/.test(codigoValue)) { // Códigos de 7 dígitos
-        console.log('✅ Código real encontrado en Codigo:', codigoValue);
-        return codigoValue;
-      }
-    }
-    
-    // PRIORIDAD 3: Buscar en otros campos posibles
-    const possibleCodeFields = ['MATERIAL', 'Material', 'material', 'CODIGO', 'Codigo', 'codigo'];
+    // Buscar en cada campo posible
     for (const field of possibleCodeFields) {
-      if (product[field] && typeof product[field] === 'string') {
-        const fieldValue = product[field].trim();
+      if (product[field] !== undefined && product[field] !== null) {
+        const fieldValue = String(product[field]).trim();
+        console.log(`🔍 Revisando campo "${field}":`, fieldValue);
+        
+        // Buscar códigos de exactamente 7 dígitos
+        const sevenDigitMatch = fieldValue.match(/\b\d{7}\b/);
+        if (sevenDigitMatch) {
+          console.log('✅ CÓDIGO DE 7 DÍGITOS ENCONTRADO:', sevenDigitMatch[0], 'en campo:', field);
+          return sevenDigitMatch[0];
+        }
+        
+        // También verificar si todo el campo es un código de 7 dígitos
         if (/^\d{7}$/.test(fieldValue)) {
-          console.log('✅ Código real encontrado en campo:', field, '=', fieldValue);
+          console.log('✅ CAMPO COMPLETO ES CÓDIGO DE 7 DÍGITOS:', fieldValue, 'en campo:', field);
           return fieldValue;
         }
       }
     }
     
-    // ÚLTIMO RECURSO: Generar código fallback solo si no hay código real
+    // Si no encuentra código de 7 dígitos, buscar cualquier código numérico
+    for (const field of possibleCodeFields) {
+      if (product[field] !== undefined && product[field] !== null) {
+        const fieldValue = String(product[field]).trim();
+        
+        // Buscar cualquier secuencia de dígitos de 4 o más caracteres
+        const anyNumberMatch = fieldValue.match(/\b\d{4,}\b/);
+        if (anyNumberMatch) {
+          console.log('⚠️ CÓDIGO ALTERNATIVO ENCONTRADO (no es 7 dígitos):', anyNumberMatch[0], 'en campo:', field);
+          return anyNumberMatch[0];
+        }
+      }
+    }
+    
+    // ÚLTIMO RECURSO: Generar código fallback
     const fallbackCode = `1${String(product.originalIndex || 0).padStart(6, '0')}`;
-    console.log('⚠️ No se encontró código real, usando fallback:', fallbackCode);
+    console.log('🚨 NO SE ENCONTRÓ CÓDIGO REAL, usando fallback:', fallbackCode);
+    console.log('🚨 Producto completo:', product);
     return fallbackCode;
   }, []);
 

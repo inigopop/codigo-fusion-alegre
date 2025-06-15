@@ -44,43 +44,65 @@ const Index = () => {
     });
   };
 
-  // Funciones para mapear correctamente los datos - CORREGIDAS PARA USAR CÓDIGOS REALES
+  // Funciones para mapear correctamente los datos - MEJORADA PARA CÓDIGOS DE 7 DÍGITOS
   const getMaterialCode = (item: any, index: number) => {
-    console.log('🔍 Buscando código real para:', item);
+    console.log('🔍 EXPORTACIÓN - BUSCANDO CÓDIGO DE 7 DÍGITOS:', item);
+    console.log('🔍 Todos los campos:', Object.keys(item));
+    console.log('🔍 Valores de campos clave:', {
+      Material: item.Material,
+      Codigo: item.Codigo,
+      MATERIAL: item.MATERIAL,
+      CODIGO: item.CODIGO
+    });
     
-    // PRIORIDAD 1: Usar el campo Material si es un código numérico válido
-    if (item.Material && typeof item.Material === 'string') {
-      const materialValue = item.Material.trim();
-      if (/^\d{7}$/.test(materialValue)) { // Códigos de 7 dígitos como en el Excel
-        console.log('✅ Código real encontrado en Material:', materialValue);
-        return materialValue;
-      }
-    }
+    // Lista de todos los campos posibles donde puede estar el código
+    const possibleCodeFields = [
+      'Material', 'MATERIAL', 'material',
+      'Codigo', 'CODIGO', 'codigo', 
+      'Code', 'CODE', 'code',
+      'SKU', 'sku', 'Sku',
+      'ID', 'id', 'Id'
+    ];
     
-    // PRIORIDAD 2: Usar el campo Codigo si es un código numérico válido
-    if (item.Codigo && typeof item.Codigo === 'string') {
-      const codigoValue = item.Codigo.trim();
-      if (/^\d{7}$/.test(codigoValue)) { // Códigos de 7 dígitos
-        console.log('✅ Código real encontrado en Codigo:', codigoValue);
-        return codigoValue;
-      }
-    }
-    
-    // PRIORIDAD 3: Buscar en otros campos posibles
-    const possibleCodeFields = ['MATERIAL', 'Material', 'material', 'CODIGO', 'Codigo', 'codigo'];
+    // Buscar en cada campo posible
     for (const field of possibleCodeFields) {
-      if (item[field] && typeof item[field] === 'string') {
-        const fieldValue = item[field].trim();
+      if (item[field] !== undefined && item[field] !== null) {
+        const fieldValue = String(item[field]).trim();
+        console.log(`🔍 EXPORTACIÓN - Revisando campo "${field}":`, fieldValue);
+        
+        // Buscar códigos de exactamente 7 dígitos
+        const sevenDigitMatch = fieldValue.match(/\b\d{7}\b/);
+        if (sevenDigitMatch) {
+          console.log('✅ EXPORTACIÓN - CÓDIGO DE 7 DÍGITOS ENCONTRADO:', sevenDigitMatch[0], 'en campo:', field);
+          return sevenDigitMatch[0];
+        }
+        
+        // También verificar si todo el campo es un código de 7 dígitos
         if (/^\d{7}$/.test(fieldValue)) {
-          console.log('✅ Código real encontrado en campo:', field, '=', fieldValue);
+          console.log('✅ EXPORTACIÓN - CAMPO COMPLETO ES CÓDIGO DE 7 DÍGITOS:', fieldValue, 'en campo:', field);
           return fieldValue;
         }
       }
     }
     
-    // ÚLTIMO RECURSO: Generar código fallback solo si no hay código real
+    // Si no encuentra código de 7 dígitos, buscar cualquier código numérico
+    for (const field of possibleCodeFields) {
+      if (item[field] !== undefined && item[field] !== null) {
+        const fieldValue = String(item[field]).trim();
+        
+        // Buscar cualquier secuencia de dígitos de 4 o más caracteres
+        const anyNumberMatch = fieldValue.match(/\b\d{4,}\b/);
+        if (anyNumberMatch) {
+          console.log('⚠️ EXPORTACIÓN - CÓDIGO ALTERNATIVO ENCONTRADO (no es 7 dígitos):', anyNumberMatch[0], 'en campo:', field);
+          return anyNumberMatch[0];
+        }
+      }
+    }
+    
+    // ÚLTIMO RECURSO: Generar código fallback
     const fallbackCode = `1${String(index).padStart(6, '0')}`;
-    console.log('⚠️ No se encontró código real, usando fallback:', fallbackCode);
+    console.log('🚨 EXPORTACIÓN - NO SE ENCONTRÓ CÓDIGO REAL, usando fallback:', fallbackCode);
+    console.log('🚨 EXPORTACIÓN - Producto completo:', item);
     return fallbackCode;
   };
 
