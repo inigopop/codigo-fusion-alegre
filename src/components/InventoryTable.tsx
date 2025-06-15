@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,37 +12,54 @@ interface InventoryTableProps {
 }
 
 const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  // Usar ID único basado en el producto en lugar de índice
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const [localStocks, setLocalStocks] = useState<{[key: number]: number}>({});
+  
+  // Generar IDs únicos para cada producto
+  const productsWithIds = useMemo(() => {
+    return data.map((item, index) => ({
+      ...item,
+      uniqueId: `${item.Material || 'no-material'}-${item.Producto?.substring(0, 20) || 'no-product'}-${index}`,
+      originalIndex: index
+    }));
+  }, [data]);
 
-  const startEdit = useCallback((index: number, currentStock: number) => {
-    console.log('Starting edit for index:', index, 'current stock:', currentStock);
-    setEditingIndex(index);
+  const startEdit = useCallback((productId: string, currentStock: number) => {
+    console.log('=== INICIO EDICIÓN ===');
+    console.log('Product ID:', productId);
+    console.log('Current Stock:', currentStock);
+    
+    setEditingProductId(productId);
     setEditValue(currentStock.toString());
-    // Store the original stock value locally
-    setLocalStocks(prev => ({ ...prev, [index]: currentStock }));
   }, []);
 
   const saveEdit = useCallback(() => {
-    console.log('Saving edit for index:', editingIndex, 'new value:', editValue);
-    if (editingIndex !== null) {
-      const numericValue = parseFloat(editValue);
-      if (!isNaN(numericValue)) {
-        onUpdateStock(editingIndex, numericValue);
-        // Update local state
-        setLocalStocks(prev => ({ ...prev, [editingIndex]: numericValue }));
+    console.log('=== GUARDANDO EDICIÓN ===');
+    console.log('Editing Product ID:', editingProductId);
+    console.log('New Value:', editValue);
+    
+    if (editingProductId !== null) {
+      const product = productsWithIds.find(p => p.uniqueId === editingProductId);
+      if (product) {
+        const numericValue = parseFloat(editValue);
+        if (!isNaN(numericValue)) {
+          console.log('Updating stock for index:', product.originalIndex, 'to:', numericValue);
+          onUpdateStock(product.originalIndex, numericValue);
+        }
       }
-      setEditingIndex(null);
+      setEditingProductId(null);
       setEditValue('');
     }
-  }, [editingIndex, editValue, onUpdateStock]);
+  }, [editingProductId, editValue, onUpdateStock, productsWithIds]);
 
   const cancelEdit = useCallback(() => {
-    console.log('Canceling edit for index:', editingIndex);
-    setEditingIndex(null);
+    console.log('=== CANCELANDO EDICIÓN ===');
+    console.log('Canceling edit for product ID:', editingProductId);
+    
+    setEditingProductId(null);
     setEditValue('');
-  }, [editingIndex]);
+  }, [editingProductId]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -56,19 +73,11 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    console.log('Input change for index:', editingIndex, 'value:', value);
+    console.log('=== CAMBIO EN INPUT ===');
+    console.log('Editing Product ID:', editingProductId);
+    console.log('New Input Value:', value);
     setEditValue(value);
-  }, [editingIndex]);
-
-  const handleInputFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    // Prevent iOS from zooming in
-    e.target.style.fontSize = '16px';
-  }, []);
-
-  const getDisplayStock = useCallback((index: number, originalStock: number) => {
-    // Use local stock if available, otherwise use original
-    return localStocks[index] !== undefined ? localStocks[index] : originalStock;
-  }, [localStocks]);
+  }, [editingProductId]);
 
   if (data.length === 0) {
     return (
@@ -103,28 +112,27 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((row, index) => {
-                const uniqueKey = `${row.Material}-${index}-${row.Producto?.substring(0, 10)}`;
-                const displayStock = getDisplayStock(index, Number(row.Stock || 0));
+              {productsWithIds.map((product) => {
+                const isEditing = editingProductId === product.uniqueId;
+                const displayStock = Number(product.Stock || 0);
                 
                 return (
-                  <TableRow key={uniqueKey}>
-                    <TableCell className="font-mono text-sm">{row.Material}</TableCell>
+                  <TableRow key={product.uniqueId}>
+                    <TableCell className="font-mono text-sm">{product.Material}</TableCell>
                     <TableCell className="font-medium max-w-[200px]">
-                      <div className="truncate" title={row.Producto}>
-                        {row.Producto}
+                      <div className="truncate" title={product.Producto}>
+                        {product.Producto}
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">{row.UMB}</TableCell>
+                    <TableCell className="text-center">{product.UMB}</TableCell>
                     <TableCell>
-                      {editingIndex === index ? (
+                      {isEditing ? (
                         <Input
                           type="number"
                           step="0.1"
                           value={editValue}
                           onChange={handleInputChange}
                           onKeyDown={handleKeyPress}
-                          onFocus={handleInputFocus}
                           className="w-20 text-center text-base"
                           autoFocus
                           inputMode="decimal"
@@ -132,7 +140,6 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                           autoCorrect="off"
                           autoCapitalize="off"
                           spellCheck="false"
-                          data-index={index}
                         />
                       ) : (
                         <span className="font-mono">
@@ -141,7 +148,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {editingIndex === index ? (
+                      {isEditing ? (
                         <div className="flex gap-1">
                           <Button 
                             size="sm" 
@@ -164,7 +171,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          onClick={() => startEdit(index, displayStock)}
+                          onClick={() => startEdit(product.uniqueId, displayStock)}
                           className="touch-manipulation min-h-[44px] min-w-[44px]"
                         >
                           <Edit className="w-4 h-4" />
