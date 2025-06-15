@@ -43,9 +43,9 @@ const Index = () => {
     });
   };
 
-  // Función de exportación mejorada con encabezados y estilos
+  // Función de exportación mejorada con encabezado principal y estilos específicos
   const exportExcel = () => {
-    console.log('=== EXPORTACIÓN CON ENCABEZADOS Y ESTILOS ===');
+    console.log('=== EXPORTACIÓN CON ENCABEZADO PRINCIPAL Y ESTILOS ===');
     
     if (excelData.length === 0) {
       toast({
@@ -57,6 +57,12 @@ const Index = () => {
     }
 
     try {
+      // Obtener mes actual en español
+      const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+                     'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+      const mesActual = meses[new Date().getMonth()];
+      const tituloCompleto = `INVENTARIO BARES ${mesActual}`;
+
       // Preparar datos con la estructura correcta
       const exportData = excelData.map(item => ({
         'MATERIAL': item.Material || '',
@@ -65,23 +71,37 @@ const Index = () => {
         'STOCK': Number(item.Stock) || 0
       }));
 
-      console.log('Exportando', exportData.length, 'productos con encabezados');
+      console.log('Exportando', exportData.length, 'productos con encabezado principal');
 
-      // Crear hoja de cálculo
-      const ws = XLSX.utils.json_to_sheet(exportData);
+      // Crear libro y hoja
       const wb = XLSX.utils.book_new();
+      const ws = {};
 
-      // Configurar encabezados con estilo
-      const headerRange = XLSX.utils.decode_range(ws['!ref'] || 'A1:D1');
-      
-      // Aplicar estilos a los encabezados
-      for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-        if (!ws[cellAddress]) continue;
-        
+      // PASO 1: Crear encabezado principal (fila 1) - fondo amarillo
+      ws['A1'] = { v: tituloCompleto, t: 's' };
+      ws['A1'].s = {
+        font: { bold: true, sz: 45, color: { rgb: "000000" } },
+        fill: { fgColor: { rgb: "FFFF05" } }, // Amarillo #ffff05
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      };
+
+      // Combinar celdas para el título principal (A1:D1)
+      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+
+      // PASO 2: Crear títulos de columnas (fila 3) - fondo gris
+      const columnHeaders = ['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK'];
+      columnHeaders.forEach((header, index) => {
+        const cellAddress = XLSX.utils.encode_cell({ r: 2, c: index }); // Fila 3 (índice 2)
+        ws[cellAddress] = { v: header, t: 's' };
         ws[cellAddress].s = {
-          font: { bold: true, color: { rgb: "FFFFFF" } },
-          fill: { fgColor: { rgb: "366092" } },
+          font: { bold: true, color: { rgb: "000000" } },
+          fill: { fgColor: { rgb: "D3D3D3" } }, // Gris
           alignment: { horizontal: "center", vertical: "center" },
           border: {
             top: { style: "thin", color: { rgb: "000000" } },
@@ -90,12 +110,24 @@ const Index = () => {
             right: { style: "thin", color: { rgb: "000000" } }
           }
         };
-      }
+      });
 
-      // Aplicar bordes a todas las celdas de datos
-      for (let row = 1; row <= exportData.length; row++) {
-        for (let col = 0; col < 4; col++) {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+      // PASO 3: Agregar datos (desde fila 4)
+      exportData.forEach((item, rowIndex) => {
+        const dataRow = rowIndex + 3; // Empezar en fila 4 (índice 3)
+        
+        // MATERIAL
+        ws[`A${dataRow + 1}`] = { v: item.MATERIAL, t: 's' };
+        // PRODUCTO  
+        ws[`B${dataRow + 1}`] = { v: item.PRODUCTO, t: 's' };
+        // UMB
+        ws[`C${dataRow + 1}`] = { v: item.UMB, t: 's' };
+        // STOCK
+        ws[`D${dataRow + 1}`] = { v: item.STOCK, t: 'n' };
+
+        // Aplicar estilos a las celdas de datos
+        ['A', 'B', 'C', 'D'].forEach((col, colIndex) => {
+          const cellAddress = `${col}${dataRow + 1}`;
           if (ws[cellAddress]) {
             ws[cellAddress].s = {
               border: {
@@ -104,23 +136,28 @@ const Index = () => {
                 left: { style: "thin", color: { rgb: "000000" } },
                 right: { style: "thin", color: { rgb: "000000" } }
               },
-              alignment: { horizontal: col === 1 ? "left" : "center" } // Producto alineado a la izquierda
+              alignment: { horizontal: colIndex === 1 ? "left" : "center" } // Producto alineado a la izquierda
             };
           }
-        }
-      }
+        });
+      });
+
+      // Configurar rango de la hoja
+      ws['!ref'] = `A1:D${exportData.length + 3}`;
 
       // Configurar anchos de columna optimizados
       ws['!cols'] = [
-        { wch: 15 }, // MATERIAL - más ancho
+        { wch: 15 }, // MATERIAL
         { wch: 40 }, // PRODUCTO - mucho más ancho para descripciones largas
         { wch: 8 },  // UMB
-        { wch: 12 }  // STOCK - un poco más ancho
+        { wch: 12 }  // STOCK
       ];
 
       // Configurar altura de filas
       ws['!rows'] = [
-        { hpt: 25 }, // Encabezado más alto
+        { hpt: 60 }, // Encabezado principal más alto (45px font)
+        { hpt: 10 }, // Fila vacía
+        { hpt: 25 }, // Títulos de columnas
         ...Array(exportData.length).fill({ hpt: 20 }) // Filas de datos
       ];
 
@@ -132,7 +169,7 @@ const Index = () => {
 
       toast({
         title: "✅ Archivo exportado correctamente",
-        description: `${exportFileName} con encabezados y ${exportData.length} productos`,
+        description: `${exportFileName} con encabezado "${tituloCompleto}" y ${exportData.length} productos`,
       });
 
     } catch (error) {
