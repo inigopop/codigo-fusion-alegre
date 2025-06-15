@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -253,8 +253,8 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
           </Table>
         </div>
       </CardContent>
-    );
-  }
+    </Card>
+  );
 };
 
 export default InventoryTable;
