@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,15 +173,28 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 const isEditing = editingProductId === product.uniqueId;
                 const displayStock = Number(product.Stock || 0);
                 
+                // Debug de datos para verificar la estructura
+                console.log('🔍 Producto debug:', {
+                  Material: product.Material,
+                  Producto: product.Producto, 
+                  UMB: product.UMB,
+                  Stock: product.Stock,
+                  allKeys: Object.keys(product)
+                });
+                
                 return (
                   <TableRow key={product.uniqueId}>
-                    <TableCell className="font-mono text-sm">{product.Material}</TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {product.Material || product.Código || product.Code || 'N/A'}
+                    </TableCell>
                     <TableCell className="font-medium max-w-[200px]">
-                      <div className="truncate" title={product.Producto}>
-                        {product.Producto}
+                      <div className="truncate" title={product.Producto || product.Descripción || product.Description || 'Sin descripción'}>
+                        {product.Producto || product.Descripción || product.Description || 'Sin descripción'}
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">{product.UMB}</TableCell>
+                    <TableCell className="text-center">
+                      {product.UMB || product.Unidad || product.Unit || 'UN'}
+                    </TableCell>
                     <TableCell>
                       {isEditing ? (
                         <Input
