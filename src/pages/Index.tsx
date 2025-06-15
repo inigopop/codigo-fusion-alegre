@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -271,12 +270,7 @@ const Index = () => {
           <TabsContent value="inventory">
             <InventoryTable 
               data={excelData}
-              onUpdateStock={(index, newStock) => {
-                const product = excelData[index];
-                if (product) {
-                  handleUpdateStock(product.Producto, newStock);
-                }
-              }}
+              onUpdateStock={handleUpdateStock}
             />
           </TabsContent>
 
