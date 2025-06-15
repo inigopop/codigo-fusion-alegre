@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,72 +12,130 @@ interface InventoryTableProps {
 }
 
 const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
-  // Usar ID único basado en el producto en lugar de índice
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Generar IDs únicos para cada producto
   const productsWithIds = useMemo(() => {
     return data.map((item, index) => ({
       ...item,
-      uniqueId: `${item.Material || 'no-material'}-${item.Producto?.substring(0, 20) || 'no-product'}-${index}`,
+      uniqueId: `product_${index}_${item.Material || 'nomaterial'}`,
       originalIndex: index
     }));
   }, [data]);
 
+  // Función para enfocar el input en iOS
+  const focusInput = useCallback(() => {
+    if (inputRef.current) {
+      // Pequeño delay para iOS
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 100);
+    }
+  }, []);
+
   const startEdit = useCallback((productId: string, currentStock: number) => {
-    console.log('=== INICIO EDICIÓN ===');
+    console.log('🔧 INICIO EDICIÓN - iOS');
     console.log('Product ID:', productId);
-    console.log('Current Stock:', currentStock);
+    console.log('Stock actual:', currentStock);
     
     setEditingProductId(productId);
     setEditValue(currentStock.toString());
-  }, []);
+    
+    // Enfocar después de que el componente se re-renderice
+    setTimeout(() => focusInput(), 50);
+  }, [focusInput]);
 
   const saveEdit = useCallback(() => {
-    console.log('=== GUARDANDO EDICIÓN ===');
-    console.log('Editing Product ID:', editingProductId);
-    console.log('New Value:', editValue);
+    console.log('💾 GUARDANDO - iOS');
+    console.log('Product ID editando:', editingProductId);
+    console.log('Nuevo valor:', editValue);
     
-    if (editingProductId !== null) {
+    if (editingProductId !== null && editValue.trim() !== '') {
       const product = productsWithIds.find(p => p.uniqueId === editingProductId);
       if (product) {
         const numericValue = parseFloat(editValue);
-        if (!isNaN(numericValue)) {
-          console.log('Updating stock for index:', product.originalIndex, 'to:', numericValue);
+        if (!isNaN(numericValue) && numericValue >= 0) {
+          console.log('✅ Actualizando índice:', product.originalIndex, 'a valor:', numericValue);
           onUpdateStock(product.originalIndex, numericValue);
+          
+          // Limpiar estado después de actualizar
+          setEditingProductId(null);
+          setEditValue('');
+          
+          console.log('✅ Estado limpiado');
+        } else {
+          console.log('❌ Valor inválido:', editValue);
         }
+      } else {
+        console.log('❌ Producto no encontrado');
       }
-      setEditingProductId(null);
-      setEditValue('');
+    } else {
+      console.log('❌ Faltan datos para guardar');
     }
   }, [editingProductId, editValue, onUpdateStock, productsWithIds]);
 
   const cancelEdit = useCallback(() => {
-    console.log('=== CANCELANDO EDICIÓN ===');
-    console.log('Canceling edit for product ID:', editingProductId);
-    
+    console.log('❌ CANCELANDO EDICIÓN - iOS');
     setEditingProductId(null);
     setEditValue('');
-  }, [editingProductId]);
+  }, []);
 
-  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
+  // Manejar eventos de teclado específicos para iOS
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    console.log('⌨️ Tecla presionada:', e.key);
+    
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       saveEdit();
     } else if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       cancelEdit();
     }
   }, [saveEdit, cancelEdit]);
 
+  // Manejar cambios en el input con validación
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    console.log('=== CAMBIO EN INPUT ===');
-    console.log('Editing Product ID:', editingProductId);
-    console.log('New Input Value:', value);
+    console.log('📝 Cambio input iOS:', value);
     setEditValue(value);
-  }, [editingProductId]);
+  }, []);
+
+  // Manejar blur del input (cuando pierde el foco)
+  const handleInputBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    console.log('👁️ Input perdió foco en iOS');
+    // No auto-guardar en blur para iOS, solo si el usuario toca guardar
+  }, []);
+
+  // Manejar touch events específicamente para iOS
+  const handleSaveTouch = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('👆 Touch save iOS');
+    saveEdit();
+  }, [saveEdit]);
+
+  const handleCancelTouch = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('👆 Touch cancel iOS');
+    cancelEdit();
+  }, [cancelEdit]);
+
+  const handleEditTouch = useCallback((productId: string, currentStock: number) => {
+    return (e: React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('👆 Touch edit iOS');
+      startEdit(productId, currentStock);
+    };
+  }, [startEdit]);
 
   if (data.length === 0) {
     return (
@@ -128,53 +186,63 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                     <TableCell>
                       {isEditing ? (
                         <Input
+                          ref={inputRef}
                           type="number"
                           step="0.1"
+                          min="0"
                           value={editValue}
                           onChange={handleInputChange}
-                          onKeyDown={handleKeyPress}
-                          className="w-20 text-center text-base"
-                          autoFocus
+                          onKeyDown={handleKeyDown}
+                          onBlur={handleInputBlur}
+                          className="w-24 text-center text-lg font-mono"
                           inputMode="decimal"
+                          pattern="[0-9]*\.?[0-9]*"
                           autoComplete="off"
                           autoCorrect="off"
                           autoCapitalize="off"
-                          spellCheck="false"
+                          spellCheck={false}
+                          style={{
+                            WebkitAppearance: 'none',
+                            fontSize: '16px', // Previene zoom en iOS
+                          }}
                         />
                       ) : (
-                        <span className="font-mono">
+                        <span className="font-mono text-lg">
                           {displayStock.toFixed(1)}
                         </span>
                       )}
                     </TableCell>
                     <TableCell>
                       {isEditing ? (
-                        <div className="flex gap-1">
+                        <div className="flex gap-2">
                           <Button 
                             size="sm" 
-                            variant="ghost" 
+                            variant="default"
                             onClick={saveEdit}
-                            className="touch-manipulation min-h-[44px] min-w-[44px]"
+                            onTouchEnd={handleSaveTouch}
+                            className="touch-manipulation min-h-[48px] min-w-[48px] bg-green-600 hover:bg-green-700 text-white"
                           >
-                            <Save className="w-4 h-4" />
+                            <Save className="w-5 h-5" />
                           </Button>
                           <Button 
                             size="sm" 
-                            variant="ghost" 
+                            variant="outline"
                             onClick={cancelEdit}
-                            className="touch-manipulation min-h-[44px] min-w-[44px]"
+                            onTouchEnd={handleCancelTouch}
+                            className="touch-manipulation min-h-[48px] min-w-[48px]"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-5 h-5" />
                           </Button>
                         </div>
                       ) : (
                         <Button 
                           size="sm" 
-                          variant="ghost" 
+                          variant="ghost"
                           onClick={() => startEdit(product.uniqueId, displayStock)}
-                          className="touch-manipulation min-h-[44px] min-w-[44px]"
+                          onTouchEnd={handleEditTouch(product.uniqueId, displayStock)}
+                          className="touch-manipulation min-h-[48px] min-w-[48px] hover:bg-blue-50"
                         >
-                          <Edit className="w-4 h-4" />
+                          <Edit className="w-5 h-5" />
                         </Button>
                       )}
                     </TableCell>
@@ -185,8 +253,8 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
           </Table>
         </div>
       </CardContent>
-    </Card>
-  );
+    );
+  }
 };
 
 export default InventoryTable;
