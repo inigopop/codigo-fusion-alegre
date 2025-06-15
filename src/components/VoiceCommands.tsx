@@ -226,8 +226,8 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
             <li>• "Buscar [término]" - Busca un término en los datos</li>
             <li>• "Limpiar pantalla" - Limpia los resultados</li>
           </ul>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
