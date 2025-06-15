@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Volume2, Search, Settings } from "lucide-react";
+import { Mic, MicOff, Volume2, Search, Settings, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
@@ -23,9 +23,169 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [confidence, setConfidence] = useState(0);
   const [lastCommand, setLastCommand] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [vocabularyReady, setVocabularyReady] = useState(false);
+  const [productDictionary, setProductDictionary] = useState<string[]>([]);
+  const [phoneticsMap, setPhoneticsMap] = useState<Map<string, string[]>>(new Map());
   const recognitionRef = useRef<any>(null);
   const restartTimeoutRef = useRef<any>(null);
   const { toast } = useToast();
+
+  // Función para normalizar texto (quitar acentos, etc.)
+  const normalizeText = (text: string): string => {
+    return text.toLowerCase()
+      .replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i')
+      .replace(/ó/g, 'o').replace(/ú/g, 'u').replace(/ñ/g, 'n')
+      .replace(/ü/g, 'u')
+      .trim();
+  };
+
+  // Función para generar variaciones fonéticas comunes
+  const generatePhoneticVariations = (word: string): string[] => {
+    const variations = new Set([word]);
+    const normalized = normalizeText(word);
+    
+    // Variaciones comunes en español
+    const phoneticRules = [
+      // B/V confusión
+      [/b/g, 'v'], [/v/g, 'b'],
+      // C/K/Q confusión
+      [/c/g, 'k'], [/k/g, 'c'], [/qu/g, 'k'],
+      // Y/LL confusión
+      [/y/g, 'll'], [/ll/g, 'y'],
+      // Z/S/C confusión
+      [/z/g, 's'], [/s/g, 'z'], [/ce/g, 'se'], [/ci/g, 'si'],
+      // H muda
+      [/h/g, ''], ['', 'h'],
+      // Dobles consonantes
+      [/rr/g, 'r'], [/r/g, 'rr'],
+    ];
+
+    phoneticRules.forEach(([from, to]) => {
+      if (typeof from === 'string') {
+        variations.add(normalized.replace(new RegExp(from, 'g'), to));
+      } else {
+        variations.add(normalized.replace(from, to));
+      }
+    });
+
+    // Agregar versiones sin espacios y con espacios
+    variations.add(normalized.replace(/\s+/g, ''));
+    variations.add(normalized.replace(/\s+/g, ' '));
+
+    return Array.from(variations);
+  };
+
+  // Procesar vocabulario del Excel
+  useEffect(() => {
+    if (excelData && excelData.length > 0) {
+      console.log('🧠 Procesando vocabulario del Excel...');
+      
+      const allWords = new Set<string>();
+      const phonetics = new Map<string, string[]>();
+      
+      excelData.forEach(item => {
+        if (item.Producto) {
+          const productName = item.Producto.toString();
+          const normalized = normalizeText(productName);
+          
+          // Agregar el producto completo
+          allWords.add(normalized);
+          phonetics.set(normalized, generatePhoneticVariations(productName));
+          
+          // Agregar palabras individuales
+          const words = normalized.split(/\s+/).filter(w => w.length >= 2);
+          words.forEach(word => {
+            allWords.add(word);
+            phonetics.set(word, generatePhoneticVariations(word));
+          });
+        }
+        
+        if (item.Material) {
+          const materialName = item.Material.toString();
+          const normalized = normalizeText(materialName);
+          allWords.add(normalized);
+          phonetics.set(normalized, generatePhoneticVariations(materialName));
+        }
+      });
+      
+      const dictionary = Array.from(allWords).sort((a, b) => b.length - a.length);
+      setProductDictionary(dictionary);
+      setPhoneticsMap(phonetics);
+      setVocabularyReady(true);
+      
+      console.log('✅ Vocabulario procesado:', dictionary.length, 'términos únicos');
+      console.log('📝 Muestra del diccionario:', dictionary.slice(0, 10));
+      
+      toast({
+        title: "🧠 Vocabulario del Excel procesado",
+        description: `${dictionary.length} términos únicos listos para reconocimiento`,
+      });
+    }
+  }, [excelData, toast]);
+
+  // Función mejorada de búsqueda con vocabulario específico
+  const intelligentSearch = (searchTerm: string): any[] => {
+    if (!searchTerm.trim() || !excelData || excelData.length === 0) {
+      return [];
+    }
+
+    const normalizedSearch = normalizeText(searchTerm);
+    console.log('🔍 Búsqueda inteligente para:', normalizedSearch);
+    
+    const results = excelData.filter((item, index) => {
+      if (!item || !item.Producto) return false;
+      
+      const productName = normalizeText(item.Producto);
+      const materialName = item.Material ? normalizeText(item.Material) : '';
+      
+      // Coincidencia exacta (prioridad alta)
+      if (productName.includes(normalizedSearch) || materialName.includes(normalizedSearch)) {
+        return true;
+      }
+      
+      // Coincidencia por palabras (prioridad media)
+      const searchWords = normalizedSearch.split(/\s+/);
+      const productWords = productName.split(/\s+/);
+      
+      const wordMatches = searchWords.filter(searchWord => 
+        productWords.some(productWord => 
+          productWord.includes(searchWord) || searchWord.includes(productWord)
+        )
+      );
+      
+      if (wordMatches.length >= Math.min(searchWords.length, 2)) {
+        return true;
+      }
+      
+      // Coincidencia fonética (prioridad baja)
+      const variations = phoneticsMap.get(normalizedSearch) || [];
+      return variations.some(variation => 
+        productName.includes(variation) || materialName.includes(variation)
+      );
+    });
+    
+    // Ordenar por relevancia
+    return results.sort((a, b) => {
+      const aProduct = normalizeText(a.Producto);
+      const bProduct = normalizeText(b.Producto);
+      
+      // Priorizar coincidencias exactas al inicio
+      const aStartsWith = aProduct.startsWith(normalizedSearch);
+      const bStartsWith = bProduct.startsWith(normalizedSearch);
+      
+      if (aStartsWith && !bStartsWith) return -1;
+      if (!aStartsWith && bStartsWith) return 1;
+      
+      // Luego por longitud (más específico primero)
+      return aProduct.length - bProduct.length;
+    }).slice(0, 8);
+  };
+
+  const searchProducts = (term: string) => {
+    const results = intelligentSearch(term);
+    console.log(`Búsqueda inteligente "${term}": ${results.length} resultados`);
+    setSearchResults(results);
+  };
 
   // Función para limpiar el estado y detener el reconocimiento completamente
   const forceStopRecognition = () => {
@@ -54,47 +214,32 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setConfidence(0);
   };
 
-  // Búsqueda inteligente mejorada
-  const searchProducts = (term: string) => {
-    if (!term.trim() || !excelData || excelData.length === 0) {
-      setSearchResults([]);
-      return;
-    }
-
-    const searchTermLower = term.toLowerCase()
-      .replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i')
-      .replace(/ó/g, 'o').replace(/ú/g, 'u').replace(/ñ/g, 'n');
-    
-    const results = excelData.filter((item, index) => {
-      if (!item || !item.Producto) return false;
-      
-      const productName = item.Producto.toLowerCase()
-        .replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i')
-        .replace(/ó/g, 'o').replace(/ú/g, 'u').replace(/ñ/g, 'n');
-      
-      return productName.includes(searchTermLower) || 
-             (item.Material && item.Material.toLowerCase().includes(searchTermLower));
-    });
-    
-    console.log(`Búsqueda "${term}": ${results.length} resultados`);
-    setSearchResults(results.slice(0, 8));
-  };
-
   // Configuración mejorada del reconocimiento de voz
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       
-      // Configuración optimizada
+      // Configuración optimizada para español con vocabulario específico
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'es-ES';
-      recognitionRef.current.maxAlternatives = 3;
-      recognitionRef.current.grammars = null;
+      recognitionRef.current.maxAlternatives = 5; // Más alternativas para mejor precisión
+      
+      // Configurar gramática personalizada si está disponible
+      if ('webkitSpeechGrammarList' in window && vocabularyReady) {
+        const grammar = '#JSGF V1.0; grammar products; public <product> = ' + 
+          productDictionary.slice(0, 50).join(' | ') + ';';
+        
+        const speechRecognitionList = new (window as any).webkitSpeechGrammarList();
+        speechRecognitionList.addFromString(grammar, 1);
+        recognitionRef.current.grammars = speechRecognitionList;
+        
+        console.log('✅ Gramática personalizada configurada con', productDictionary.length, 'términos');
+      }
 
       recognitionRef.current.onstart = () => {
-        console.log('🎤 Reconocimiento iniciado');
+        console.log('🎤 Reconocimiento iniciado con vocabulario específico');
         setTranscript('');
         setInterimTranscript('');
         setIsProcessing(false);
@@ -107,8 +252,38 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
-          const transcript = result[0].transcript;
-          const confidence = result[0].confidence || 0;
+          
+          // Evaluar todas las alternativas
+          let bestAlternative = result[0];
+          let bestScore = 0;
+          
+          for (let j = 0; j < result.length; j++) {
+            const alternative = result[j];
+            const transcript = normalizeText(alternative.transcript);
+            
+            // Calcular puntuación basada en coincidencias con vocabulario
+            let score = alternative.confidence || 0;
+            
+            if (vocabularyReady) {
+              const words = transcript.split(/\s+/);
+              const vocabularyMatches = words.filter(word => 
+                productDictionary.some(dictWord => 
+                  dictWord.includes(word) || word.includes(dictWord)
+                )
+              );
+              
+              // Bonus por coincidencias con vocabulario
+              score += (vocabularyMatches.length / words.length) * 0.3;
+            }
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestAlternative = alternative;
+            }
+          }
+          
+          const transcript = bestAlternative.transcript;
+          const confidence = bestScore;
           
           if (confidence > maxConfidence) {
             maxConfidence = confidence;
@@ -124,8 +299,8 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         setConfidence(maxConfidence);
         setInterimTranscript(interimTranscript);
         
-        if (finalTranscript && maxConfidence > 0.3) {
-          console.log('🎯 Comando final:', finalTranscript, 'Confianza:', maxConfidence);
+        if (finalTranscript && maxConfidence > 0.2) { // Umbral más bajo con vocabulario específico
+          console.log('🎯 Comando final con vocabulario:', finalTranscript, 'Confianza:', maxConfidence);
           setTranscript(finalTranscript);
           setLastCommand(finalTranscript);
           processVoiceCommand(finalTranscript, maxConfidence);
@@ -134,8 +309,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
       recognitionRef.current.onerror = (event: any) => {
         console.error('❌ Error reconocimiento:', event.error);
-        
-        // Detener procesamiento en caso de error
         setIsProcessing(false);
         
         if (event.error === 'no-speech') {
@@ -160,7 +333,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           });
         }
         
-        // Forzar detención completa en caso de error crítico
         forceStopRecognition();
       };
 
@@ -169,7 +341,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         setIsProcessing(false);
         setInterimTranscript('');
         
-        // Solo reiniciar si todavía estamos en modo escucha
         if (isListening && recognitionRef.current) {
           restartTimeoutRef.current = setTimeout(() => {
             if (recognitionRef.current && isListening) {
@@ -188,114 +359,101 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       };
     }
 
-    // Cleanup al desmontar
     return () => {
       forceStopRecognition();
     };
-  }, [isListening, setIsListening]);
+  }, [isListening, setIsListening, vocabularyReady, productDictionary]);
 
-  // Procesamiento inteligente de comandos
+  // Procesamiento inteligente de comandos con vocabulario específico
   const processVoiceCommand = async (command: string, confidence: number) => {
     if (isProcessing) return;
     
     setIsProcessing(true);
-    const lowerCommand = command.toLowerCase().trim()
-      .replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i')
-      .replace(/ó/g, 'o').replace(/ú/g, 'u').replace(/ñ/g, 'n');
+    const normalizedCommand = normalizeText(command);
     
-    console.log('🔄 Procesando:', lowerCommand, 'Confianza:', confidence);
+    console.log('🔄 Procesando con vocabulario específico:', normalizedCommand, 'Confianza:', confidence);
 
     try {
       // Comando de búsqueda
-      if (lowerCommand.includes('buscar') || lowerCommand.includes('busca')) {
-        const searchTerm = lowerCommand
+      if (normalizedCommand.includes('buscar') || normalizedCommand.includes('busca')) {
+        const searchTerm = normalizedCommand
           .replace(/buscar|busca/g, '').trim()
-          .replace(/el |la |los |las |un |una /g, ''); // Remover artículos
+          .replace(/el |la |los |las |un |una /g, '');
         
         if (searchTerm.length >= 2) {
           setSearchTerm(searchTerm);
-          searchProducts(searchTerm);
-          speak(`Buscando ${searchTerm}. Encontrados ${searchResults.length} productos.`);
+          const results = intelligentSearch(searchTerm);
+          setSearchResults(results);
+          speak(`Buscando ${searchTerm}. Encontrados ${results.length} productos.`);
           
           toast({
-            title: `🔍 Búsqueda: "${searchTerm}"`,
-            description: `Se encontraron ${searchResults.length} productos`,
+            title: `🔍 Búsqueda inteligente: "${searchTerm}"`,
+            description: `Se encontraron ${results.length} productos con vocabulario específico`,
           });
         }
         setIsProcessing(false);
         return;
       }
 
-      // Comando de stock mejorado con múltiples patrones
+      // Comando de stock mejorado con vocabulario específico
       const stockPatterns = [
-        // "producto cantidad"
         /^(.+?)\s+(\d+(?:[.,]\d+)?)$/,
-        // "cantidad para producto"
         /^(\d+(?:[.,]\d+)?)\s+(?:para|de)\s+(.+)$/,
-        // "stock producto cantidad"
         /^(?:stock|inventario)\s+(.+?)\s+(\d+(?:[.,]\d+)?)$/,
-        // "actualizar producto a cantidad"
         /^(?:actualizar|cambiar)\s+(.+?)\s+(?:a|con)\s+(\d+(?:[.,]\d+)?)$/
       ];
 
       for (const pattern of stockPatterns) {
-        const match = lowerCommand.match(pattern);
+        const match = normalizedCommand.match(pattern);
         
         if (match) {
           let productTerm, stockValue;
           
           if (pattern.source.startsWith('^(\\d+')) {
-            // Patrón "cantidad para producto"
             stockValue = parseFloat(match[1].replace(',', '.'));
             productTerm = match[2].trim();
           } else {
-            // Otros patrones "producto cantidad"
             productTerm = match[1].trim();
             stockValue = parseFloat(match[2].replace(',', '.'));
           }
           
           if (!isNaN(stockValue) && productTerm.length >= 2) {
-            // Buscar producto con coincidencia inteligente
-            const foundProductIndex = excelData.findIndex((item, index) => {
-              if (!item || !item.Producto) return false;
-              
-              const productName = item.Producto.toLowerCase()
-                .replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i')
-                .replace(/ó/g, 'o').replace(/ú/g, 'u').replace(/ñ/g, 'n');
-              
-              // Coincidencia exacta o parcial inteligente
-              return productName.includes(productTerm) || 
-                     productTerm.split(' ').every(word => 
-                       word.length >= 2 && productName.includes(word)
-                     );
-            });
+            // Buscar producto con el sistema inteligente
+            const results = intelligentSearch(productTerm);
             
-            if (foundProductIndex !== -1) {
-              const foundProduct = excelData[foundProductIndex];
-              onUpdateStock(foundProductIndex, stockValue);
+            if (results.length > 0) {
+              const bestMatch = results[0]; // El primer resultado es el mejor match
+              const foundProductIndex = excelData.findIndex(item => 
+                item.Producto === bestMatch.Producto && 
+                item.Material === bestMatch.Material
+              );
               
-              speak(`Stock actualizado. ${foundProduct.Producto}: ${stockValue} unidades.`);
-              
-              toast({
-                title: "✅ Stock actualizado por voz",
-                description: `${foundProduct.Producto}: ${stockValue}`,
-                duration: 3000,
-              });
-              
-              setIsProcessing(false);
-              return;
+              if (foundProductIndex !== -1) {
+                onUpdateStock(foundProductIndex, stockValue);
+                
+                speak(`Stock actualizado con vocabulario específico. ${bestMatch.Producto}: ${stockValue} unidades.`);
+                
+                toast({
+                  title: "✅ Stock actualizado por voz inteligente",
+                  description: `${bestMatch.Producto}: ${stockValue}`,
+                  duration: 3000,
+                });
+                
+                setIsProcessing(false);
+                return;
+              }
             }
           }
         }
       }
 
       // Si llegamos aquí, el comando no fue reconocido
-      if (confidence > 0.6) {
-        speak('No pude entender el comando. Intenta con "buscar producto" o "producto cantidad".');
+      if (confidence > 0.4) {
+        speak('No pude encontrar ese producto en el vocabulario. Intenta con "buscar producto" o "producto cantidad".');
         
         toast({
-          title: "Comando no reconocido",
-          description: `"${command}" - Usa: "buscar [producto]" o "[producto] [cantidad]"`,
+          title: "Producto no encontrado en vocabulario",
+          description: `"${command}" - El sistema conoce ${productDictionary.length} productos específicos`,
           variant: "destructive",
         });
       }
@@ -330,16 +488,23 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       return;
     }
 
+    if (!vocabularyReady) {
+      toast({
+        title: "Vocabulario no listo",
+        description: "Espera a que se procese el vocabulario del Excel",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (isListening) {
-      // Detener completamente
       forceStopRecognition();
       speak('Reconocimiento de voz desactivado');
     } else {
-      // Iniciar
       try {
         recognitionRef.current.start();
         setIsListening(true);
-        speak('Reconocimiento de voz activado');
+        speak(`Reconocimiento de voz activado con ${productDictionary.length} productos específicos`);
       } catch (error) {
         console.error('Error iniciando reconocimiento:', error);
         forceStopRecognition();
@@ -384,25 +549,28 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
   return (
     <div className="space-y-4">
-      {/* Estado del sistema mejorado */}
-      <Card className="border-blue-200 bg-blue-50">
+      {/* Estado del vocabulario */}
+      <Card className="border-purple-200 bg-purple-50">
         <CardContent className="p-4">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="font-medium text-blue-700 mb-2">🎤 Estado del Reconocimiento:</h3>
-              <div className="text-sm text-blue-600 space-y-1">
+              <h3 className="font-medium text-purple-700 mb-2 flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                🧠 Vocabulario del Excel:
+              </h3>
+              <div className="text-sm text-purple-600 space-y-1">
                 <p>Productos: {excelData?.length || 0}</p>
-                <p>Disponible: {recognitionRef.current ? '✅' : '❌'}</p>
-                <p>Estado: {isListening ? '🎤 Escuchando' : '⏸️ Inactivo'}</p>
+                <p>Vocabulario: {vocabularyReady ? `✅ ${productDictionary.length} términos` : '⏳ Procesando...'}</p>
+                <p>Estado: {isListening ? '🎤 Escuchando inteligente' : '⏸️ Inactivo'}</p>
                 {confidence > 0 && (
-                  <div>Confianza: <Badge variant={confidence > 0.7 ? 'default' : 'secondary'}>{Math.round(confidence * 100)}%</Badge></div>
+                  <div>Confianza: <Badge variant={confidence > 0.6 ? 'default' : 'secondary'}>{Math.round(confidence * 100)}%</Badge></div>
                 )}
               </div>
             </div>
             {isProcessing && (
               <div className="flex items-center gap-2 text-amber-600">
                 <div className="w-3 h-3 bg-amber-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium">Procesando...</span>
+                <span className="text-sm font-medium">Procesando con IA...</span>
               </div>
             )}
           </div>
@@ -413,7 +581,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       {(interimTranscript || transcript) && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="p-4">
-            <h4 className="font-medium text-green-700 mb-2">📝 Transcripción:</h4>
+            <h4 className="font-medium text-green-700 mb-2">📝 Reconocimiento Inteligente:</h4>
             <div className="space-y-2">
               {interimTranscript && (
                 <p className="text-sm text-gray-600 italic">
@@ -422,7 +590,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
               )}
               {transcript && (
                 <p className="text-sm font-medium text-green-800">
-                  Último comando: "{transcript}"
+                  Comando procesado: "{transcript}"
                 </p>
               )}
             </div>
@@ -430,17 +598,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </Card>
       )}
 
-      {/* Buscador */}
+      {/* Buscador mejorado */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Buscar Productos</CardTitle>
+          <CardTitle className="text-lg">Buscar Productos (Con IA)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Buscar productos..."
+                placeholder="Buscar productos con reconocimiento inteligente..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
@@ -460,7 +628,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                   >
                     <div className="font-medium">{product.Producto}</div>
                     <div className="text-sm text-gray-500">
-                      Código: {product.Codigo} | Stock: {product.Stock || 0}
+                      Material: {product.Material} | Stock: {product.Stock || 0}
                     </div>
                   </div>
                 ))}
@@ -474,7 +642,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                     <div>
                       <h4 className="font-medium">{selectedProduct.Producto}</h4>
                       <p className="text-sm text-gray-600">
-                        Código: {selectedProduct.Codigo} | Stock actual: {selectedProduct.Stock || 0}
+                        Material: {selectedProduct.Material} | Stock actual: {selectedProduct.Stock || 0}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -513,29 +681,30 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           variant={isListening ? "destructive" : "default"}
           size="lg"
           className="flex items-center gap-2"
-          disabled={isProcessing}
+          disabled={isProcessing || !vocabularyReady}
         >
           {isListening ? (
             <>
               <MicOff className="w-5 h-5" />
-              Detener Escucha
+              Detener Escucha Inteligente
             </>
           ) : (
             <>
               <Mic className="w-5 h-5" />
-              Iniciar Control por Voz
+              Iniciar Control IA por Voz
             </>
           )}
         </Button>
 
         <Button
-          onClick={() => speak('Sistema de reconocimiento de voz mejorado y funcionando correctamente')}
+          onClick={() => speak(`Sistema de reconocimiento inteligente con ${productDictionary.length} productos específicos del Excel`)}
           variant="outline"
           size="lg"
           className="flex items-center gap-2"
+          disabled={!vocabularyReady}
         >
           <Volume2 className="w-5 h-5" />
-          Probar Voz
+          Probar Voz IA
         </Button>
       </div>
 
@@ -545,48 +714,47 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             <div className="flex items-center gap-3">
               <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
               <span className="text-sm font-medium text-red-700">
-                🎤 Escuchando... {confidence > 0 && `(${Math.round(confidence * 100)}% confianza)`}
+                🧠 Escuchando con IA... {confidence > 0 && `(${Math.round(confidence * 100)}% confianza)`}
               </span>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Guía de comandos mejorada */}
+      {/* Guía de comandos actualizada */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Settings className="w-5 h-5" />
-            Comandos de Voz Mejorados
+            Comandos de Voz con IA ({productDictionary.length} productos)
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 text-sm">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <h4 className="font-medium text-blue-700">🔍 Búsqueda:</h4>
-                <p>• "buscar aceite"</p>
-                <p>• "busca azúcar"</p>
+                <h4 className="font-medium text-blue-700">🔍 Búsqueda Inteligente:</h4>
+                <p>• "buscar aceite" → encuentra "Aceite de oliva"</p>
+                <p>• "busca azucar" → encuentra "Azúcar blanco"</p>
               </div>
               
               <div className="space-y-2">
-                <h4 className="font-medium text-green-700">📦 Actualizar Stock:</h4>
-                <p>• "aceite cinco"</p>
-                <p>• "azúcar diez coma cinco"</p>
-                <p>• "stock vino tres"</p>
-                <p>• "actualizar aceite a cinco"</p>
+                <h4 className="font-medium text-green-700">📦 Stock con IA:</h4>
+                <p>• "aceite cinco" → actualiza cualquier aceite</p>
+                <p>• "azucar diez" → reconoce sin tildes</p>
+                <p>• "vino tres" → encuentra productos similares</p>
               </div>
             </div>
             
-            <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
-              <h4 className="font-medium text-amber-800 mb-2">💡 Consejos para mejor reconocimiento:</h4>
-              <ul className="text-sm text-amber-700 space-y-1">
-                <li>• Habla claro y a velocidad normal</li>
-                <li>• Mantén el micrófono cerca (30cm aprox.)</li>
-                <li>• Evita ruido de fondo</li>
-                <li>• Usa nombres de productos simplificados</li>
-                <li>• Espera a que termine de procesar antes del siguiente comando</li>
-                <li>• Si falla, usa el botón "Detener Escucha" y vuelve a empezar</li>
+            <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+              <h4 className="font-medium text-green-800 mb-2">🧠 Ventajas del Sistema IA:</h4>
+              <ul className="text-sm text-green-700 space-y-1">
+                <li>• ✅ Reconoce productos específicos de tu Excel</li>
+                <li>• ✅ Corrige errores fonéticos automáticamente</li>
+                <li>• ✅ Entiende variaciones (aceite = aceyte = azeite)</li>
+                <li>• ✅ Busca por palabras parciales inteligentemente</li>
+                <li>• ✅ Mejor precisión con tu vocabulario específico</li>
+                <li>• ✅ Gramática personalizada para tus productos</li>
               </ul>
             </div>
           </div>
