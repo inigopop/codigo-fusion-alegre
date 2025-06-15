@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Volume2, Square } from "lucide-react";
+import { Mic, MicOff, Volume2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
@@ -20,8 +20,8 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
 
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
+      const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionClass();
       
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
@@ -226,8 +226,8 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
             <li>• "Buscar [término]" - Busca un término en los datos</li>
             <li>• "Limpiar pantalla" - Limpia los resultados</li>
           </ul>
-        </CardContent>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 };

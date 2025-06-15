@@ -6,7 +6,7 @@ interface SpeechRecognition extends EventTarget {
   start(): void;
   stop(): void;
   onresult: (event: SpeechRecognitionEvent) => void;
-  onerror: (event: SpeechRecognitionError) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
   onend: () => void;
 }
 
@@ -33,15 +33,19 @@ interface SpeechRecognitionAlternative {
   confidence: number;
 }
 
-interface SpeechRecognitionError {
+interface SpeechRecognitionErrorEvent extends Event {
   error: string;
   message: string;
 }
 
 declare global {
   interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
+    SpeechRecognition: {
+      new (): SpeechRecognition;
+    };
+    webkitSpeechRecognition: {
+      new (): SpeechRecognition;
+    };
   }
 }
 
