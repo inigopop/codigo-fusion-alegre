@@ -32,7 +32,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         const worksheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[worksheetName];
         
-        console.log('=== PROCESANDO ARCHIVO ORIGINAL ===');
+        console.log('=== PROCESANDO ARCHIVO CORREGIDO ===');
         
         // Convertir toda la hoja a JSON para ver la estructura real
         const allData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
@@ -58,26 +58,42 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
 
         // Procesar datos desde la fila siguiente a los encabezados
         const processedData = [];
+        console.log('Iniciando procesamiento de datos...');
+        
         for (let i = headerRowIndex + 1; i < allData.length; i++) {
           const row = allData[i] as any[];
           
-          // Verificar que la fila tenga datos válidos
-          if (row && row[0] && row[1]) {
+          console.log(`Procesando fila ${i}:`, row);
+          
+          // Verificar que la fila tenga datos válidos - CORREGIDO
+          // Cambio: verificar row[1] (Material) en lugar de row[0]
+          if (row && row.length > 1 && row[1]) {
+            const material = String(row[1] || '');  // Columna B: MATERIAL
+            const producto = String(row[2] || '');  // Columna C: PRODUCTO  
+            const umb = String(row[3] || 'UN');     // Columna D: UMB
+            const stock = Number(row[4]) || 0;      // Columna E: STOCK
+            
             const item = {
-              Material: String(row[0] || ''),        // Columna A: MATERIAL (código)
-              Producto: String(row[1] || ''),        // Columna B: PRODUCTO (descripción)
-              Codigo: String(row[0] || ''),          // Usar el material como código también
-              UMB: String(row[2] || 'UN'),          // Columna C: UMB (unidad)
-              Stock: Number(row[3]) || 0            // Columna D: STOCK (cantidad)
+              Material: material,
+              Producto: producto,
+              Codigo: material,  // Usar el material como código también
+              UMB: umb,
+              Stock: stock
             };
             
-            console.log(`Procesando fila ${i}:`, item);
+            console.log(`✅ Producto procesado:`, item);
             processedData.push(item);
+          } else {
+            console.log(`❌ Fila ${i} omitida - datos insuficientes:`, row);
           }
         }
         
-        console.log('✅ Datos procesados correctamente:', processedData.length, 'productos');
+        console.log('✅ Procesamiento completado:', processedData.length, 'productos');
         console.log('Muestra de productos:', processedData.slice(0, 3));
+        
+        if (processedData.length === 0) {
+          throw new Error('No se encontraron productos válidos en el archivo');
+        }
         
         onDataProcessed(processedData, {}, {}, file.name);
         
