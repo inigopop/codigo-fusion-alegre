@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,9 +43,9 @@ const Index = () => {
     });
   };
 
-  // Función de exportación simplificada
+  // Función de exportación mejorada con encabezados y estilos
   const exportExcel = () => {
-    console.log('=== EXPORTACIÓN SIMPLIFICADA ===');
+    console.log('=== EXPORTACIÓN CON ENCABEZADOS Y ESTILOS ===');
     
     if (excelData.length === 0) {
       toast({
@@ -58,30 +57,74 @@ const Index = () => {
     }
 
     try {
-      // Datos para exportar - estructura simple
+      // Preparar datos con la estructura correcta
       const exportData = excelData.map(item => ({
         'MATERIAL': item.Material || '',
-        'CODIGO': item.Codigo || '',
         'PRODUCTO': item.Producto || '',
         'UMB': item.UMB || 'UN',
         'STOCK': Number(item.Stock) || 0
       }));
 
-      console.log('Exportando', exportData.length, 'productos');
+      console.log('Exportando', exportData.length, 'productos con encabezados');
 
       // Crear hoja de cálculo
       const ws = XLSX.utils.json_to_sheet(exportData);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
 
-      // Configurar anchos de columna
+      // Configurar encabezados con estilo
+      const headerRange = XLSX.utils.decode_range(ws['!ref'] || 'A1:D1');
+      
+      // Aplicar estilos a los encabezados
+      for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!ws[cellAddress]) continue;
+        
+        ws[cellAddress].s = {
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          fill: { fgColor: { rgb: "366092" } },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          }
+        };
+      }
+
+      // Aplicar bordes a todas las celdas de datos
+      for (let row = 1; row <= exportData.length; row++) {
+        for (let col = 0; col < 4; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+          if (ws[cellAddress]) {
+            ws[cellAddress].s = {
+              border: {
+                top: { style: "thin", color: { rgb: "000000" } },
+                bottom: { style: "thin", color: { rgb: "000000" } },
+                left: { style: "thin", color: { rgb: "000000" } },
+                right: { style: "thin", color: { rgb: "000000" } }
+              },
+              alignment: { horizontal: col === 1 ? "left" : "center" } // Producto alineado a la izquierda
+            };
+          }
+        }
+      }
+
+      // Configurar anchos de columna optimizados
       ws['!cols'] = [
-        { wch: 12 }, // MATERIAL
-        { wch: 12 }, // CODIGO  
-        { wch: 35 }, // PRODUCTO
+        { wch: 15 }, // MATERIAL - más ancho
+        { wch: 40 }, // PRODUCTO - mucho más ancho para descripciones largas
         { wch: 8 },  // UMB
-        { wch: 10 }  // STOCK
+        { wch: 12 }  // STOCK - un poco más ancho
       ];
+
+      // Configurar altura de filas
+      ws['!rows'] = [
+        { hpt: 25 }, // Encabezado más alto
+        ...Array(exportData.length).fill({ hpt: 20 }) // Filas de datos
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Inventario");
 
       const exportFileName = `${fileName.replace(/\.[^/.]+$/, "") || "inventario"}_actualizado.xlsx`;
       
@@ -89,7 +132,7 @@ const Index = () => {
 
       toast({
         title: "✅ Archivo exportado correctamente",
-        description: `${exportFileName} con ${exportData.length} productos`,
+        description: `${exportFileName} con encabezados y ${exportData.length} productos`,
       });
 
     } catch (error) {
@@ -134,7 +177,7 @@ const Index = () => {
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
             >
               <Download className="w-5 h-5" />
-              📥 Exportar Excel ({excelData.length} productos)
+              📥 Exportar Excel con Formato ({excelData.length} productos)
             </Button>
           </div>
         )}
