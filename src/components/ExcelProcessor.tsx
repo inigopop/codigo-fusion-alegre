@@ -33,36 +33,36 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         const worksheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[worksheetName];
         
+        console.log('Processing Excel file...');
+        
+        // Guardar la hoja completa con estilos para exportación
         const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-        const headerRow: any = {};
-        const headerStyles: any = {};
+        const originalHeader: any = {};
+        const originalStyles: any = {};
         
-        console.log('Processing Excel file with range:', range);
-        
-        // Guardar encabezado original (primera fila)
+        // Capturar encabezado original y estilos de la primera fila
         for (let col = range.s.c; col <= range.e.c; col++) {
           const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
           const cell = worksheet[cellAddress];
           if (cell) {
             const colLetter = XLSX.utils.encode_col(col);
-            headerRow[colLetter] = cell.v;
-            headerStyles[cellAddress] = cell.s || {};
+            originalHeader[colLetter] = cell.v;
+            originalStyles[cellAddress] = cell.s || {};
             console.log(`Header ${colLetter}: ${cell.v}`);
           }
         }
         
-        // Convertir datos empezando desde la fila 2 (fila 1 es el encabezado)
+        // Convertir datos empezando desde la fila 2
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-          range: 1, // Empezar desde la fila 2 (índice 1)
+          range: 1,
           header: ['Material', 'Producto', 'UMB', 'Stock'],
-          defval: '' // Valor por defecto para celdas vacías
+          defval: ''
         });
         
         console.log('Excel data processed:', jsonData.length, 'rows');
-        console.log('Sample data:', jsonData.slice(0, 3));
-        console.log('Original header:', headerRow);
+        console.log('Original header captured:', originalHeader);
         
-        onDataProcessed(jsonData, headerRow, headerStyles, file.name);
+        onDataProcessed(jsonData, originalHeader, originalStyles, file.name);
         
         toast({
           title: "Archivo procesado exitosamente",
@@ -92,7 +92,11 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
     });
   };
 
-  const handleFileSelect = () => {
+  const handleFileSelect = (event?: React.MouseEvent) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     fileInputRef.current?.click();
   };
 
@@ -101,6 +105,8 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
     if (file) {
       processExcelFile(file);
     }
+    // Limpiar el input para permitir seleccionar el mismo archivo otra vez
+    event.target.value = '';
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -113,7 +119,8 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
       'application/vnd.ms-excel': ['.xls'],
       'text/csv': ['.csv']
     },
-    multiple: false
+    multiple: false,
+    noClick: true // Desactivar click en la zona de drop para que solo funcione nuestro botón
   });
 
   return (
@@ -122,7 +129,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         <CardContent className="p-6">
           <div
             {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
               isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
             }`}
           >

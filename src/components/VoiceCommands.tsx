@@ -25,7 +25,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const { toast } = useToast();
 
   useEffect(() => {
-    // Verificar compatibilidad con reconocimiento de voz
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     
     if (SpeechRecognition) {
@@ -97,9 +96,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     console.log('Available products:', excelData.length);
 
     const results = excelData.filter(item => {
-      const productMatch = item.Producto && item.Producto.toLowerCase().includes(term.toLowerCase());
-      const materialMatch = item.Material && item.Material.toString().toLowerCase().includes(term.toLowerCase());
-      return productMatch || materialMatch;
+      if (!item.Producto) return false;
+      
+      const productName = item.Producto.toLowerCase();
+      const searchTerm = term.toLowerCase();
+      
+      // Búsqueda más flexible - incluye palabras parciales
+      const words = searchTerm.split(' ');
+      return words.every(word => 
+        productName.includes(word) || 
+        productName.split(' ').some(productWord => productWord.includes(word))
+      ) || productName.includes(searchTerm);
     });
     
     console.log('Search results:', results.length);
@@ -109,7 +116,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const processVoiceCommand = (command: string) => {
     const lowerCommand = command.toLowerCase().trim();
     console.log('Processing voice command:', lowerCommand);
-    console.log('Available data:', excelData.length, 'products');
 
     if (excelData.length === 0) {
       const result = 'No hay datos de inventario cargados';
@@ -135,15 +141,15 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     // Comando para actualizar stock - patrones más flexibles
     const patterns = [
       /(.+?)\s+(\d+(?:[.,]\d+)?)$/,
-      /actualizar\s+(.+?)\s+a\s+(\d+(?:[.,]\d+)?)/i,
       /(.+?)\s+cantidad\s+(\d+(?:[.,]\d+)?)/i,
-      /(.+?)\s+stock\s+(\d+(?:[.,]\d+)?)/i
+      /(.+?)\s+stock\s+(\d+(?:[.,]\d+)?)/i,
+      /actualizar\s+(.+?)\s+a\s+(\d+(?:[.,]\d+)?)/i
     ];
 
     for (const pattern of patterns) {
       const match = lowerCommand.match(pattern);
       if (match) {
-        const productName = match[1].trim();
+        let productName = match[1].trim();
         const stockValue = match[2].replace(',', '.');
         const stock = parseFloat(stockValue);
         
@@ -156,11 +162,11 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             const itemName = item.Producto.toLowerCase();
             const searchName = productName.toLowerCase();
             
-            // Búsqueda más flexible
+            // Múltiples formas de búsqueda
             return itemName.includes(searchName) || 
                    searchName.includes(itemName) ||
-                   itemName.split(' ').some(word => searchName.includes(word)) ||
-                   searchName.split(' ').some(word => itemName.includes(word));
+                   itemName.split(' ').some(word => searchName.includes(word) && word.length > 2) ||
+                   searchName.split(' ').some(word => itemName.includes(word) && word.length > 2);
           });
           
           if (foundProduct) {
@@ -168,10 +174,11 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             onUpdateStock(foundProduct.Producto, stock);
             const result = `Stock actualizado: ${foundProduct.Producto} = ${stock}`;
             setCommandResult(result);
-            speak(`Stock de ${foundProduct.Producto} actualizado a ${stock}`);
+            speak(`Stock actualizado a ${stock}`);
             return;
           } else {
             console.log('Product not found for:', productName);
+            console.log('Available products:', excelData.map(item => item.Producto).slice(0, 5));
             const result = `No se encontró el producto: ${productName}`;
             setCommandResult(result);
             speak('Producto no encontrado');
@@ -240,7 +247,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputInput>) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchTerm(value);
     searchProducts(value);
