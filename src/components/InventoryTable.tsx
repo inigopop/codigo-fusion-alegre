@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +23,24 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
       originalIndex: index
     }));
   }, [data]);
+
+  // Función para obtener el código del material
+  const getMaterialCode = useCallback((product: any) => {
+    // Buscar en diferentes campos posibles para el código
+    return product.Codigo || product.Code || product.Material || 'N/A';
+  }, []);
+
+  // Función para obtener el nombre del producto
+  const getProductName = useCallback((product: any) => {
+    // El nombre del producto está en Material (según los logs)
+    return product.Material || product.Descripción || product.Description || product.Producto || 'Sin descripción';
+  }, []);
+
+  // Función para obtener la unidad
+  const getUnit = useCallback((product: any) => {
+    // La unidad está en Producto (según los logs) o UMB
+    return product.Producto || product.UMB || product.Unidad || product.Unit || 'UN';
+  }, []);
 
   // Función para enfocar el input en iOS
   const focusInput = useCallback(() => {
@@ -173,27 +190,31 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 const isEditing = editingProductId === product.uniqueId;
                 const displayStock = Number(product.Stock || 0);
                 
-                // Debug de datos para verificar la estructura
-                console.log('🔍 Producto debug:', {
-                  Material: product.Material,
-                  Producto: product.Producto, 
-                  UMB: product.UMB,
-                  Stock: product.Stock,
-                  allKeys: Object.keys(product)
+                // Obtener los valores correctos para cada columna
+                const materialCode = getMaterialCode(product);
+                const productName = getProductName(product);
+                const unit = getUnit(product);
+                
+                console.log('🔍 Producto corregido:', {
+                  originalMaterial: product.Material,
+                  materialCode,
+                  productName,
+                  unit,
+                  stock: displayStock
                 });
                 
                 return (
                   <TableRow key={product.uniqueId}>
                     <TableCell className="font-mono text-sm">
-                      {product.Material || product.Código || product.Code || 'N/A'}
+                      {materialCode}
                     </TableCell>
                     <TableCell className="font-medium max-w-[200px]">
-                      <div className="truncate" title={product.Producto || product.Descripción || product.Description || 'Sin descripción'}>
-                        {product.Producto || product.Descripción || product.Description || 'Sin descripción'}
+                      <div className="truncate" title={productName}>
+                        {productName}
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      {product.UMB || product.Unidad || product.Unit || 'UN'}
+                      {unit}
                     </TableCell>
                     <TableCell>
                       {isEditing ? (

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,8 +44,21 @@ const Index = () => {
     });
   };
 
+  // Funciones para mapear correctamente los datos
+  const getMaterialCode = (item: any) => {
+    return item.Codigo || item.Code || 'N/A';
+  };
+
+  const getProductName = (item: any) => {
+    return item.Material || item.Descripción || item.Description || 'Sin descripción';
+  };
+
+  const getUnit = (item: any) => {
+    return item.Producto || item.UMB || item.Unidad || item.Unit || 'UN';
+  };
+
   const exportExcel = async () => {
-    console.log('=== EXPORTACIÓN CON EXCELJS ===');
+    console.log('=== EXPORTACIÓN CON EXCELJS CORREGIDA ===');
     
     if (excelData.length === 0) {
       toast({
@@ -120,13 +134,13 @@ const Index = () => {
         };
       });
 
-      // FILAS DE DATOS
+      // FILAS DE DATOS - CORREGIDAS
       excelData.forEach(item => {
         const dataRow = worksheet.addRow([
-          item.Material || '',
-          item.Producto || '',
-          item.UMB || 'UN',
-          Number(item.Stock) || 0
+          getMaterialCode(item),     // Códigos en columna Material
+          getProductName(item),      // Nombres en columna Producto  
+          getUnit(item),             // Unidades en columna UMB
+          Number(item.Stock) || 0    // Stock en columna Stock
         ]);
         
         dataRow.eachCell((cell, colNumber) => {
