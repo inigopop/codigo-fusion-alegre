@@ -43,7 +43,6 @@ const Index = () => {
     });
   };
 
-  // Función de exportación corregida con estilos específicos
   const exportExcel = () => {
     console.log('=== EXPORTACIÓN CON ENCABEZADO PRINCIPAL Y ESTILOS ===');
     
@@ -76,33 +75,47 @@ const Index = () => {
       // Crear libro de trabajo
       const wb = XLSX.utils.book_new();
       
-      // Crear hoja manualmente
-      const ws_data = [];
+      // Crear datos para la hoja
+      const wsData = [];
       
       // Fila 1: Encabezado principal
-      ws_data.push([tituloCompleto, '', '', '']);
+      wsData.push([tituloCompleto, '', '', '']);
       
       // Fila 2: Vacía
-      ws_data.push(['', '', '', '']);
+      wsData.push(['', '', '', '']);
       
       // Fila 3: Títulos de columnas
-      ws_data.push(['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK']);
+      wsData.push(['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK']);
       
       // Filas de datos
       exportData.forEach(item => {
-        ws_data.push([item.MATERIAL, item.PRODUCTO, item.UMB, item.STOCK]);
+        wsData.push([item.MATERIAL, item.PRODUCTO, item.UMB, item.STOCK]);
       });
 
       // Crear la hoja de trabajo
-      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-      // Aplicar estilos manualmente
-      
-      // Estilo para el encabezado principal (A1) - Fondo amarillo
+      // Configurar celdas individuales con estilos
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:D1');
+
+      // Estilo del encabezado principal (A1) - Fondo amarillo
+      if (!ws['A1']) ws['A1'] = { v: tituloCompleto, t: 's' };
       ws['A1'].s = {
-        font: { bold: true, sz: 45, color: { rgb: "000000" } },
-        fill: { fgColor: { rgb: "FFFF05" } },
-        alignment: { horizontal: "center", vertical: "center" },
+        font: { 
+          bold: true, 
+          sz: 45, 
+          name: "Arial",
+          color: { rgb: "000000" } 
+        },
+        fill: { 
+          fgColor: { rgb: "FFFF05" },
+          patternType: "solid"
+        },
+        alignment: { 
+          horizontal: "center", 
+          vertical: "center",
+          wrapText: false
+        },
         border: {
           top: { style: "thin", color: { rgb: "000000" } },
           bottom: { style: "thin", color: { rgb: "000000" } },
@@ -111,11 +124,14 @@ const Index = () => {
         }
       };
 
-      // Aplicar el mismo estilo a las celdas combinadas del encabezado
-      ['B1', 'C1', 'D1'].forEach(cell => {
-        if (!ws[cell]) ws[cell] = { v: '', t: 's' };
-        ws[cell].s = {
-          fill: { fgColor: { rgb: "FFFF05" } },
+      // Aplicar el mismo estilo a las celdas B1, C1, D1 para el merge
+      ['B1', 'C1', 'D1'].forEach(cellAddr => {
+        if (!ws[cellAddr]) ws[cellAddr] = { v: '', t: 's' };
+        ws[cellAddr].s = {
+          fill: { 
+            fgColor: { rgb: "FFFF05" },
+            patternType: "solid"
+          },
           border: {
             top: { style: "thin", color: { rgb: "000000" } },
             bottom: { style: "thin", color: { rgb: "000000" } },
@@ -126,12 +142,22 @@ const Index = () => {
       });
 
       // Estilos para los títulos de columnas (fila 3) - Fondo gris
-      ['A3', 'B3', 'C3', 'D3'].forEach(cell => {
-        if (ws[cell]) {
-          ws[cell].s = {
-            font: { bold: true, color: { rgb: "000000" } },
-            fill: { fgColor: { rgb: "D3D3D3" } },
-            alignment: { horizontal: "center", vertical: "center" },
+      ['A3', 'B3', 'C3', 'D3'].forEach(cellAddr => {
+        if (ws[cellAddr]) {
+          ws[cellAddr].s = {
+            font: { 
+              bold: true, 
+              name: "Arial",
+              color: { rgb: "000000" } 
+            },
+            fill: { 
+              fgColor: { rgb: "D3D3D3" },
+              patternType: "solid"
+            },
+            alignment: { 
+              horizontal: "center", 
+              vertical: "center" 
+            },
             border: {
               top: { style: "thin", color: { rgb: "000000" } },
               bottom: { style: "thin", color: { rgb: "000000" } },
@@ -142,19 +168,23 @@ const Index = () => {
         }
       });
 
-      // Estilos para las celdas de datos
+      // Estilos para las celdas de datos (desde fila 4)
       for (let row = 4; row <= exportData.length + 3; row++) {
         ['A', 'B', 'C', 'D'].forEach((col, colIndex) => {
-          const cellAddress = `${col}${row}`;
-          if (ws[cellAddress]) {
-            ws[cellAddress].s = {
+          const cellAddr = `${col}${row}`;
+          if (ws[cellAddr]) {
+            ws[cellAddr].s = {
+              font: { name: "Arial" },
               border: {
                 top: { style: "thin", color: { rgb: "000000" } },
                 bottom: { style: "thin", color: { rgb: "000000" } },
                 left: { style: "thin", color: { rgb: "000000" } },
                 right: { style: "thin", color: { rgb: "000000" } }
               },
-              alignment: { horizontal: colIndex === 1 ? "left" : "center" }
+              alignment: { 
+                horizontal: colIndex === 1 ? "left" : "center",
+                vertical: "center" 
+              }
             };
           }
         });
@@ -162,9 +192,6 @@ const Index = () => {
 
       // Combinar celdas para el título principal (A1:D1)
       ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-
-      // Configurar rango de la hoja
-      ws['!ref'] = `A1:D${exportData.length + 3}`;
 
       // Configurar anchos de columna
       ws['!cols'] = [
@@ -176,11 +203,14 @@ const Index = () => {
 
       // Configurar altura de filas
       ws['!rows'] = [
-        { hpt: 60 }, // Encabezado principal
+        { hpt: 60 }, // Encabezado principal (más alto)
         { hpt: 10 }, // Fila vacía
         { hpt: 25 }, // Títulos de columnas
         ...Array(exportData.length).fill({ hpt: 20 }) // Filas de datos
       ];
+
+      // Configurar rango de la hoja
+      ws['!ref'] = `A1:D${exportData.length + 3}`;
 
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
 
