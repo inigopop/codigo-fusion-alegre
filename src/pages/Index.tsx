@@ -63,8 +63,6 @@ const Index = () => {
   const exportExcel = () => {
     console.log('=== EXPORT DEBUG ===');
     console.log('Excel data length:', excelData.length);
-    console.log('Original header:', originalHeader);
-    console.log('Original styles:', originalStyles);
     console.log('Sample data item:', excelData[0]);
 
     if (excelData.length === 0) {
@@ -77,18 +75,30 @@ const Index = () => {
     }
 
     try {
+      // Filtrar datos válidos para exportación
+      const validData = excelData.filter(item => {
+        return item && item.Producto && 
+               typeof item.Producto === 'string' && 
+               item.Producto.trim() !== '' &&
+               item.Producto !== 'INVENTARIO BARES ABRIL 2025' &&
+               item.Producto !== 'MATERIAL' &&
+               !item.Producto.match(/^\d+$/);
+      });
+
+      console.log('Valid data for export:', validData.length);
+      console.log('Sample valid item:', validData[0]);
+
       // Crear libro de trabajo
       const wb = XLSX.utils.book_new();
       
-      // Preparar los datos manteniendo la estructura original
+      // Preparar los datos en el formato correcto
       const exportData: any[][] = [];
       
-      // Fila de encabezado - usar el encabezado original o uno por defecto
-      const headers = ['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK'];
-      exportData.push(headers);
+      // Fila de encabezados
+      exportData.push(['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK']);
       
-      // Añadir datos
-      excelData.forEach(item => {
+      // Añadir datos válidos
+      validData.forEach(item => {
         exportData.push([
           item.Material || '',
           item.Producto || '',
@@ -97,25 +107,26 @@ const Index = () => {
         ]);
       });
       
-      console.log('Export data prepared:', exportData.length, 'rows');
+      console.log('Export data rows:', exportData.length);
       console.log('Headers:', exportData[0]);
-      console.log('Sample row:', exportData[1]);
+      console.log('Sample data row:', exportData[1]);
       
       // Crear hoja de trabajo
       const ws = XLSX.utils.aoa_to_sheet(exportData);
       
-      // Configurar el rango
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      console.log('Sheet range:', range);
+      // Configurar anchos de columna
+      ws['!cols'] = [
+        { wch: 15 },  // Material
+        { wch: 50 },  // Producto 
+        { wch: 10 },  // UMB
+        { wch: 15 }   // Stock
+      ];
       
-      // Aplicar formato a los encabezados
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-        if (!ws[cellAddress]) {
-          ws[cellAddress] = { v: headers[col], t: 's' };
-        }
+      // Aplicar formato a los encabezados (fila 1)
+      const headerCells = ['A1', 'B1', 'C1', 'D1'];
+      headerCells.forEach(cellAddress => {
+        if (!ws[cellAddress]) return;
         
-        // Aplicar estilo de encabezado
         ws[cellAddress].s = {
           fill: { fgColor: { rgb: "366092" } },
           font: { bold: true, color: { rgb: "FFFFFF" } },
@@ -127,24 +138,17 @@ const Index = () => {
             right: { style: "thin", color: { rgb: "000000" } }
           }
         };
-      }
-      
-      // Configurar anchos de columna
-      ws['!cols'] = [
-        { wch: 15 }, // Material
-        { wch: 50 }, // Producto 
-        { wch: 10 }, // UMB
-        { wch: 15 }  // Stock
-      ];
+      });
       
       // Aplicar bordes a todas las celdas de datos
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
       for (let row = 1; row <= range.e.r; row++) {
-        for (let col = range.s.c; col <= range.e.c; col++) {
+        for (let col = 0; col <= 3; col++) {
           const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
           if (!ws[cellAddress]) continue;
           
-          // Asegurar que la columna de stock sea numérica
-          if (col === 3 && ws[cellAddress]) { // Columna D (Stock)
+          // Asegurar que la columna de stock (D) sea numérica
+          if (col === 3 && ws[cellAddress]) {
             ws[cellAddress].t = 'n';
             if (typeof ws[cellAddress].v === 'string') {
               ws[cellAddress].v = parseFloat(ws[cellAddress].v) || 0;
@@ -169,14 +173,14 @@ const Index = () => {
       const baseFileName = fileName.replace(/\.[^/.]+$/, "") || "inventario";
       const exportFileName = `${baseFileName}_actualizado.xlsx`;
       
-      // Exportar
+      // Exportar archivo
       XLSX.writeFile(wb, exportFileName);
       
       console.log('Export completed successfully');
       
       toast({
         title: "Archivo exportado exitosamente",
-        description: `Se ha descargado ${exportFileName} con ${excelData.length} productos`,
+        description: `Se ha descargado ${exportFileName} con ${validData.length} productos válidos`,
       });
       
     } catch (error) {

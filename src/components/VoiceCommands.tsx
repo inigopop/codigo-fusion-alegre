@@ -21,7 +21,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [stockInput, setStockInput] = useState('');
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -33,13 +33,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'es-ES';
 
-      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-        console.log('Speech recognition result event:', event);
+      recognitionRef.current.onresult = (event: any) => {
+        console.log('=== SPEECH RECOGNITION RESULT ===');
+        console.log('Event results length:', event.results.length);
+        
         let currentTranscript = '';
         let finalTranscript = '';
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
+          console.log(`Result ${i}: "${transcript}" (final: ${event.results[i].isFinal})`);
+          
           if (event.results[i].isFinal) {
             finalTranscript += transcript;
           } else {
@@ -51,7 +55,8 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         console.log('Current transcript:', currentTranscript);
         
         if (finalTranscript) {
-          console.log('Final transcript received:', finalTranscript);
+          console.log('=== FINAL TRANSCRIPT RECEIVED ===');
+          console.log('Final transcript:', finalTranscript);
           setLastCommand(finalTranscript);
           processVoiceCommand(finalTranscript);
         }
@@ -77,44 +82,58 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   }, [setIsListening]);
 
   const searchProducts = (term: string) => {
-    console.log('=== SEARCH DEBUG ===');
+    console.log('=== SEARCH PRODUCTS DEBUG ===');
     console.log('Search term:', term);
     console.log('Excel data length:', excelData.length);
-    console.log('First 3 products:', excelData.slice(0, 3));
-
+    
     if (!term.trim() || excelData.length === 0) {
+      console.log('Empty term or no data, clearing results');
       setSearchResults([]);
       return;
     }
 
-    const results = excelData.filter(item => {
-      if (!item || !item.Producto) {
-        console.log('Item without Producto:', item);
-        return false;
+    // Filtrar datos válidos primero
+    const validData = excelData.filter(item => {
+      const hasValidProduct = item && item.Producto && 
+                            typeof item.Producto === 'string' && 
+                            item.Producto.trim() !== '' &&
+                            item.Producto !== 'INVENTARIO BARES ABRIL 2025' &&
+                            item.Producto !== 'MATERIAL' &&
+                            !item.Producto.match(/^\d+$/); // No solo números
+      
+      if (hasValidProduct) {
+        console.log('Valid product found:', item.Producto);
       }
-      
-      const productName = item.Producto.toString().toLowerCase();
-      const searchTermLower = term.toLowerCase();
-      
+      return hasValidProduct;
+    });
+
+    console.log('Valid products count:', validData.length);
+    console.log('First 5 valid products:', validData.slice(0, 5).map(p => p.Producto));
+
+    const searchTermLower = term.toLowerCase();
+    const results = validData.filter(item => {
+      const productName = item.Producto.toLowerCase();
       const matches = productName.includes(searchTermLower);
+      
       if (matches) {
-        console.log('Match found:', item.Producto);
+        console.log('Search match found:', item.Producto);
       }
       
       return matches;
     });
     
-    console.log('Search results found:', results.length);
+    console.log('Final search results:', results.length);
     console.log('Results:', results.map(r => r.Producto));
     setSearchResults(results.slice(0, 10));
   };
 
   const processVoiceCommand = (command: string) => {
-    console.log('=== VOICE COMMAND DEBUG ===');
-    console.log('Processing command:', command);
+    console.log('=== PROCESS VOICE COMMAND DEBUG ===');
+    console.log('Raw command:', command);
     console.log('Excel data available:', excelData.length);
 
     const lowerCommand = command.toLowerCase().trim();
+    console.log('Processed command:', lowerCommand);
 
     if (excelData.length === 0) {
       const result = 'No hay datos de inventario cargados';
@@ -122,6 +141,18 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       speak(result);
       return;
     }
+
+    // Filtrar datos válidos
+    const validData = excelData.filter(item => {
+      return item && item.Producto && 
+             typeof item.Producto === 'string' && 
+             item.Producto.trim() !== '' &&
+             item.Producto !== 'INVENTARIO BARES ABRIL 2025' &&
+             item.Producto !== 'MATERIAL' &&
+             !item.Producto.match(/^\d+$/);
+    });
+
+    console.log('Valid data for voice command:', validData.length);
 
     // Buscar patrón: "producto cantidad"
     const stockUpdatePattern = /(.+?)\s+(\d+(?:[.,]\d+)?)$/;
@@ -132,25 +163,39 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       const stockValue = match[2].replace(',', '.');
       const stock = parseFloat(stockValue);
       
-      console.log('Trying to update:', productSearchTerm, 'to stock:', stock);
+      console.log('=== STOCK UPDATE ATTEMPT ===');
+      console.log('Product search term:', productSearchTerm);
+      console.log('Stock value:', stock);
       
       if (!isNaN(stock)) {
-        // Buscar producto
-        const foundProduct = excelData.find(item => {
-          if (!item || !item.Producto) return false;
-          const itemName = item.Producto.toString().toLowerCase();
-          return itemName.includes(productSearchTerm);
+        // Buscar producto en datos válidos
+        const foundProduct = validData.find(item => {
+          const itemName = item.Producto.toLowerCase();
+          const matches = itemName.includes(productSearchTerm);
+          console.log(`Checking "${itemName}" contains "${productSearchTerm}": ${matches}`);
+          return matches;
         });
         
         if (foundProduct) {
-          console.log('Product found, updating:', foundProduct.Producto);
+          console.log('=== PRODUCT FOUND FOR UPDATE ===');
+          console.log('Found product:', foundProduct.Producto);
+          console.log('Updating stock to:', stock);
+          
           onUpdateStock(foundProduct.Producto, stock);
           const result = `Stock actualizado: ${foundProduct.Producto} = ${stock}`;
           setCommandResult(result);
-          speak(`Stock actualizado a ${stock}`);
+          speak(`Stock de ${foundProduct.Producto} actualizado a ${stock}`);
+          
+          toast({
+            title: "Stock actualizado por voz",
+            description: `${foundProduct.Producto}: ${stock}`,
+          });
           return;
         } else {
-          console.log('Product not found for search term:', productSearchTerm);
+          console.log('=== PRODUCT NOT FOUND ===');
+          console.log('Search term:', productSearchTerm);
+          console.log('Available products:', validData.slice(0, 5).map(p => p.Producto));
+          
           const result = `No se encontró el producto: ${productSearchTerm}`;
           setCommandResult(result);
           speak('Producto no encontrado');
@@ -163,12 +208,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     if (lowerCommand.includes('buscar')) {
       const searchTermFromVoice = lowerCommand.replace('buscar', '').trim();
       if (searchTermFromVoice) {
-        console.log('Voice search for:', searchTermFromVoice);
+        console.log('Voice search initiated for:', searchTermFromVoice);
         setSearchTerm(searchTermFromVoice);
         searchProducts(searchTermFromVoice);
         speak(`Buscando ${searchTermFromVoice}`);
+        return;
       }
-      return;
     }
 
     const result = 'Comando no reconocido. Intenta: "producto cantidad" o "buscar producto"';
@@ -197,9 +242,11 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
 
     if (isListening) {
+      console.log('Stopping speech recognition');
       recognitionRef.current.stop();
     } else {
       try {
+        console.log('Starting speech recognition');
         recognitionRef.current.start();
         setIsListening(true);
       } catch (error) {
@@ -215,13 +262,15 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    console.log('Search input changed to:', value);
+    console.log('=== SEARCH INPUT CHANGE ===');
+    console.log('New search value:', value);
     setSearchTerm(value);
     searchProducts(value);
   };
 
   const selectProduct = (product: any) => {
-    console.log('Product selected:', product);
+    console.log('=== PRODUCT SELECTED ===');
+    console.log('Selected product:', product);
     setSelectedProduct(product);
     setSearchResults([]);
     setSearchTerm('');
@@ -232,13 +281,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     if (selectedProduct && stockInput) {
       const stock = parseFloat(stockInput.replace(',', '.'));
       if (!isNaN(stock)) {
-        console.log('Updating selected product stock:', selectedProduct.Producto, 'to', stock);
+        console.log('=== MANUAL STOCK UPDATE ===');
+        console.log('Product:', selectedProduct.Producto);
+        console.log('New stock:', stock);
+        
         onUpdateStock(selectedProduct.Producto, stock);
         const result = `Stock actualizado: ${selectedProduct.Producto} = ${stock}`;
         setCommandResult(result);
         speak(`Stock actualizado a ${stock}`);
         setSelectedProduct(null);
         setStockInput('');
+        
         toast({
           title: "Stock actualizado",
           description: `${selectedProduct.Producto}: ${stock}`,
@@ -276,7 +329,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                   >
                     <div className="font-medium text-gray-900">{product.Producto}</div>
                     <div className="text-sm text-gray-500">
-                      Código: {product.Material} | Stock: {Number(product.Stock || 0).toFixed(1)} {product.UMB}
+                      Código: {product.Material || 'N/A'} | Stock: {Number(product.Stock || 0).toFixed(1)} {product.UMB || ''}
                     </div>
                   </div>
                 ))}
@@ -290,7 +343,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                     <div>
                       <h4 className="font-medium">{selectedProduct.Producto}</h4>
                       <p className="text-sm text-gray-600">
-                        Código: {selectedProduct.Material} | Unidad: {selectedProduct.UMB}
+                        Código: {selectedProduct.Material || 'N/A'} | Unidad: {selectedProduct.UMB || 'N/A'}
                       </p>
                       <p className="text-sm text-gray-600">
                         Stock actual: {Number(selectedProduct.Stock || 0).toFixed(1)}
