@@ -4,64 +4,106 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ExcelProcessor from "@/components/ExcelProcessor";
 import VoiceCommands from "@/components/VoiceCommands";
-import { FileSpreadsheet, Mic } from "lucide-react";
+import InventoryTable from "@/components/InventoryTable";
+import { FileSpreadsheet, Mic, ClipboardList } from "lucide-react";
 
 const Index = () => {
   const [excelData, setExcelData] = useState<any[]>([]);
+  const [originalHeader, setOriginalHeader] = useState<any>({});
+  const [originalStyles, setOriginalStyles] = useState<any>({});
   const [isListening, setIsListening] = useState(false);
+
+  const handleDataProcessed = (data: any[], header: any, styles: any) => {
+    setExcelData(data);
+    setOriginalHeader(header);
+    setOriginalStyles(styles);
+  };
+
+  const handleUpdateStock = (productNameOrIndex: string | number, newStock: number) => {
+    setExcelData(prevData => {
+      return prevData.map((item, index) => {
+        if (typeof productNameOrIndex === 'string') {
+          // Actualización por nombre (comandos de voz)
+          if (item.Producto === productNameOrIndex) {
+            return { ...item, Stock: newStock };
+          }
+        } else {
+          // Actualización por índice (edición manual)
+          if (index === productNameOrIndex) {
+            return { ...item, Stock: newStock };
+          }
+        }
+        return item;
+      });
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Excel Voice Assistant
+            Sistema de Inventario Hotelero
           </h1>
           <p className="text-xl text-gray-600">
-            Procesa archivos Excel y controla con comandos de voz
+            Gestiona el inventario del economato con control por voz
           </p>
         </div>
 
         <Tabs defaultValue="excel" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="excel" className="flex items-center gap-2">
               <FileSpreadsheet className="w-4 h-4" />
-              Procesador Excel
+              Cargar Archivo
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Inventario
             </TabsTrigger>
             <TabsTrigger value="voice" className="flex items-center gap-2">
               <Mic className="w-4 h-4" />
-              Comandos de Voz
+              Control por Voz
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="excel">
             <Card>
               <CardHeader>
-                <CardTitle>Procesador de Archivos Excel</CardTitle>
+                <CardTitle>Carga de Archivo del Economato</CardTitle>
                 <CardDescription>
-                  Carga y procesa archivos Excel, analiza encabezados y datos
+                  Importa el archivo Excel del economato. El encabezado se conservará automáticamente para la exportación.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ExcelProcessor 
-                  onDataProcessed={setExcelData}
+                  onDataProcessed={handleDataProcessed}
                   existingData={excelData}
+                  originalHeader={originalHeader}
+                  originalStyles={originalStyles}
                 />
               </CardContent>
             </Card>
           </TabsContent>
 
+          <TabsContent value="inventory">
+            <InventoryTable 
+              data={excelData}
+              onUpdateStock={handleUpdateStock}
+            />
+          </TabsContent>
+
           <TabsContent value="voice">
             <Card>
               <CardHeader>
-                <CardTitle>Control por Voz</CardTitle>
+                <CardTitle>Control por Voz del Inventario</CardTitle>
                 <CardDescription>
-                  Usa comandos de voz para interactuar con tus datos de Excel
+                  Actualiza el stock de productos usando comandos de voz en español
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <VoiceCommands 
                   excelData={excelData}
+                  onUpdateStock={handleUpdateStock}
                   isListening={isListening}
                   setIsListening={setIsListening}
                 />
@@ -69,48 +111,6 @@ const Index = () => {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {excelData.length > 0 && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Vista Previa de Datos</CardTitle>
-              <CardDescription>
-                {excelData.length} registros cargados
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      {excelData[0] && Object.keys(excelData[0]).map((header) => (
-                        <th key={header} className="border border-gray-300 p-2 text-left font-semibold">
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {excelData.slice(0, 5).map((row, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        {Object.values(row).map((cell: any, cellIndex) => (
-                          <td key={cellIndex} className="border border-gray-300 p-2">
-                            {String(cell)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {excelData.length > 5 && (
-                  <p className="text-sm text-gray-500 mt-2">
-                    Mostrando 5 de {excelData.length} registros
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );

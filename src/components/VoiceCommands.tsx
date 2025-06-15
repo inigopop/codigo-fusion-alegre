@@ -1,17 +1,18 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mic, MicOff, Volume2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
   excelData: any[];
+  onUpdateStock: (productName: string, newStock: number) => void;
   isListening: boolean;
   setIsListening: (value: boolean) => void;
 }
 
-const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommandsProps) => {
+const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }: VoiceCommandsProps) => {
   const [transcript, setTranscript] = useState('');
   const [lastCommand, setLastCommand] = useState('');
   const [commandResult, setCommandResult] = useState('');
@@ -69,39 +70,57 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
     console.log('Processing voice command:', lowerCommand);
 
     if (excelData.length === 0) {
-      setCommandResult('No hay datos de Excel cargados para procesar comandos.');
-      speak('No hay datos de Excel cargados');
+      const result = 'No hay datos de inventario cargados';
+      setCommandResult(result);
+      speak(result);
       return;
     }
 
-    // Command processing
-    if (lowerCommand.includes('cuántos registros') || lowerCommand.includes('total registros')) {
-      const result = `Hay ${excelData.length} registros en total`;
+    // Comando para actualizar stock por voz
+    // Formato: "actualizar [producto] a [cantidad]" o "[producto] [cantidad]"
+    const updateRegex = /(?:actualizar\s+(.+?)\s+a\s+(\d+(?:[.,]\d+)?)|(.+?)\s+(\d+(?:[.,]\d+)?))/i;
+    const match = lowerCommand.match(updateRegex);
+    
+    if (match) {
+      const productName = (match[1] || match[3])?.trim();
+      const stockValue = (match[2] || match[4])?.replace(',', '.');
+      
+      if (productName && stockValue) {
+        const stock = parseFloat(stockValue);
+        if (!isNaN(stock)) {
+          // Buscar el producto más similar
+          const foundProduct = excelData.find(item => 
+            item.Producto.toLowerCase().includes(productName.toLowerCase()) ||
+            productName.toLowerCase().includes(item.Producto.toLowerCase().split(' ')[0])
+          );
+          
+          if (foundProduct) {
+            onUpdateStock(foundProduct.Producto, stock);
+            const result = `Stock actualizado: ${foundProduct.Producto} = ${stock.toFixed(1)}`;
+            setCommandResult(result);
+            speak(`Stock actualizado a ${stock.toFixed(1)}`);
+          } else {
+            const result = `No se encontró el producto: ${productName}`;
+            setCommandResult(result);
+            speak('Producto no encontrado');
+          }
+          return;
+        }
+      }
+    }
+
+    // Otros comandos de consulta
+    if (lowerCommand.includes('cuántos productos') || lowerCommand.includes('total productos')) {
+      const result = `Hay ${excelData.length} productos en el inventario`;
       setCommandResult(result);
       speak(result);
-    } else if (lowerCommand.includes('columnas') || lowerCommand.includes('encabezados')) {
-      const headers = Object.keys(excelData[0] || {});
-      const result = `Las columnas son: ${headers.join(', ')}`;
-      setCommandResult(result);
-      speak(`Hay ${headers.length} columnas: ${headers.slice(0, 3).join(', ')}`);
-    } else if (lowerCommand.includes('primer registro') || lowerCommand.includes('primera fila')) {
-      const firstRow = excelData[0];
-      if (firstRow) {
-        const values = Object.values(firstRow).slice(0, 3);
-        const result = `Primer registro: ${values.join(', ')}`;
-        setCommandResult(result);
-        speak(result);
-      }
     } else if (lowerCommand.includes('buscar') || lowerCommand.includes('encontrar')) {
-      // Simple search functionality
-      const searchTerm = lowerCommand.split('buscar')[1]?.trim() || lowerCommand.split('encontrar')[1]?.trim();
+      const searchTerm = lowerCommand.split(/buscar|encontrar/)[1]?.trim();
       if (searchTerm) {
         const matches = excelData.filter(row => 
-          Object.values(row).some(value => 
-            String(value).toLowerCase().includes(searchTerm)
-          )
+          row.Producto.toLowerCase().includes(searchTerm)
         );
-        const result = `Encontré ${matches.length} registros que contienen "${searchTerm}"`;
+        const result = `Encontré ${matches.length} productos que contienen "${searchTerm}"`;
         setCommandResult(result);
         speak(result);
       }
@@ -110,7 +129,7 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
       setLastCommand('');
       speak('Pantalla limpiada');
     } else {
-      const result = 'Comando no reconocido. Intenta con: "cuántos registros", "columnas", "primer registro", "buscar [término]"';
+      const result = 'Comando no reconocido. Prueba: "actualizar [producto] a [cantidad]" o "[producto] [cantidad]"';
       setCommandResult(result);
       speak('Comando no reconocido');
     }
@@ -143,10 +162,6 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
     }
   };
 
-  const testSpeak = () => {
-    speak('Funcionalidad de voz funcionando correctamente');
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex gap-4">
@@ -159,18 +174,18 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
           {isListening ? (
             <>
               <MicOff className="w-5 h-5" />
-              Detener
+              Detener Escucha
             </>
           ) : (
             <>
               <Mic className="w-5 h-5" />
-              Iniciar Escucha
+              Iniciar Control por Voz
             </>
           )}
         </Button>
 
         <Button
-          onClick={testSpeak}
+          onClick={() => speak('Control de voz funcionando correctamente')}
           variant="outline"
           size="lg"
           className="flex items-center gap-2"
@@ -186,7 +201,7 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-blue-700">Escuchando...</span>
+                <span className="text-sm font-medium text-blue-700">Escuchando comandos de inventario...</span>
               </div>
             </div>
             {transcript && (
@@ -217,15 +232,22 @@ const VoiceCommands = ({ excelData, isListening, setIsListening }: VoiceCommands
       )}
 
       <Card>
-        <CardContent className="p-4">
-          <h3 className="font-medium text-gray-700 mb-3">Comandos disponibles:</h3>
-          <ul className="text-sm text-gray-600 space-y-1">
-            <li>• "¿Cuántos registros hay?" - Cuenta total de registros</li>
-            <li>• "¿Qué columnas hay?" - Lista las columnas disponibles</li>
-            <li>• "Muestra el primer registro" - Muestra la primera fila</li>
-            <li>• "Buscar [término]" - Busca un término en los datos</li>
+        <CardHeader>
+          <CardTitle className="text-lg">Comandos de Voz para Inventario</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="text-sm text-gray-600 space-y-2">
+            <li><strong>• "Actualizar [producto] a [cantidad]"</strong> - Actualiza el stock de un producto</li>
+            <li><strong>• "[producto] [cantidad]"</strong> - Forma corta para actualizar stock</li>
+            <li>• "¿Cuántos productos hay?" - Cuenta total de productos</li>
+            <li>• "Buscar [término]" - Busca productos por nombre</li>
             <li>• "Limpiar pantalla" - Limpia los resultados</li>
           </ul>
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-700">
+              <strong>Ejemplos:</strong> "Actualizar leche a 5.5", "Pan 3.2", "Buscar aceite"
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
