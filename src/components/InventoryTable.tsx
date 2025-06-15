@@ -28,27 +28,43 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función para obtener el código del material - CORREGIDA COMPLETAMENTE
+  // Función para obtener el código del material - CORREGIDA PARA USAR CÓDIGOS REALES
   const getMaterialCode = useCallback((product: any) => {
-    console.log('🔍 Producto completo:', product);
+    console.log('🔍 Buscando código en producto:', product);
     
-    // Buscar en todos los campos posibles para el código
-    const possibleCodeFields = [
-      'MATERIAL', 'Material', 'material',
-      'CODIGO', 'Codigo', 'codigo', 'Code', 'code',
-      'ID', 'id', 'Id'
-    ];
-    
-    for (const field of possibleCodeFields) {
-      if (product[field] && typeof product[field] === 'string' && /^\d+$/.test(product[field])) {
-        console.log('✅ Código encontrado en campo:', field, '=', product[field]);
-        return product[field];
+    // PRIORIDAD 1: Usar el campo Material si es un código numérico válido
+    if (product.Material && typeof product.Material === 'string') {
+      const materialValue = product.Material.trim();
+      if (/^\d{7}$/.test(materialValue)) { // Códigos de 7 dígitos como en el Excel
+        console.log('✅ Código real encontrado en Material:', materialValue);
+        return materialValue;
       }
     }
     
-    // Si no hay código numérico, usar el índice + 1000000 como fallback
+    // PRIORIDAD 2: Usar el campo Codigo si es un código numérico válido
+    if (product.Codigo && typeof product.Codigo === 'string') {
+      const codigoValue = product.Codigo.trim();
+      if (/^\d{7}$/.test(codigoValue)) { // Códigos de 7 dígitos
+        console.log('✅ Código real encontrado en Codigo:', codigoValue);
+        return codigoValue;
+      }
+    }
+    
+    // PRIORIDAD 3: Buscar en otros campos posibles
+    const possibleCodeFields = ['MATERIAL', 'Material', 'material', 'CODIGO', 'Codigo', 'codigo'];
+    for (const field of possibleCodeFields) {
+      if (product[field] && typeof product[field] === 'string') {
+        const fieldValue = product[field].trim();
+        if (/^\d{7}$/.test(fieldValue)) {
+          console.log('✅ Código real encontrado en campo:', field, '=', fieldValue);
+          return fieldValue;
+        }
+      }
+    }
+    
+    // ÚLTIMO RECURSO: Generar código fallback solo si no hay código real
     const fallbackCode = `1${String(product.originalIndex || 0).padStart(6, '0')}`;
-    console.log('⚠️ Usando código fallback:', fallbackCode);
+    console.log('⚠️ No se encontró código real, usando fallback:', fallbackCode);
     return fallbackCode;
   }, []);
 
@@ -242,12 +258,12 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 const displayStock = Number(product.Stock || 0);
                 
                 // Obtener los valores correctos EXACTAMENTE como en el Excel original
-                const materialCode = getMaterialCode(product);  // Código numérico en MATERIAL
+                const materialCode = getMaterialCode(product);  // Código numérico REAL del Excel
                 const productName = getProductName(product);    // Descripción en PRODUCTO
                 const unit = getUnit(product);                  // Unidad en UMB
                 
                 console.log('🏗️ Fila renderizada:', {
-                  materialCode,    // Debe ser código numérico
+                  materialCode,    // Debe ser código numérico REAL
                   productName,     // Debe ser descripción completa
                   unit,           // Debe ser la unidad
                   stock: displayStock

@@ -44,27 +44,43 @@ const Index = () => {
     });
   };
 
-  // Funciones para mapear correctamente los datos - EXACTAMENTE COMO EN LA TABLA
+  // Funciones para mapear correctamente los datos - CORREGIDAS PARA USAR CÓDIGOS REALES
   const getMaterialCode = (item: any, index: number) => {
-    console.log('🔍 Buscando código para:', item);
+    console.log('🔍 Buscando código real para:', item);
     
-    // Buscar en todos los campos posibles para el código
-    const possibleCodeFields = [
-      'MATERIAL', 'Material', 'material',
-      'CODIGO', 'Codigo', 'codigo', 'Code', 'code',
-      'ID', 'id', 'Id'
-    ];
-    
-    for (const field of possibleCodeFields) {
-      if (item[field] && typeof item[field] === 'string' && /^\d+$/.test(item[field])) {
-        console.log('✅ Código encontrado:', field, '=', item[field]);
-        return item[field];
+    // PRIORIDAD 1: Usar el campo Material si es un código numérico válido
+    if (item.Material && typeof item.Material === 'string') {
+      const materialValue = item.Material.trim();
+      if (/^\d{7}$/.test(materialValue)) { // Códigos de 7 dígitos como en el Excel
+        console.log('✅ Código real encontrado en Material:', materialValue);
+        return materialValue;
       }
     }
     
-    // Si no hay código numérico, usar el índice + 1000000 como fallback
+    // PRIORIDAD 2: Usar el campo Codigo si es un código numérico válido
+    if (item.Codigo && typeof item.Codigo === 'string') {
+      const codigoValue = item.Codigo.trim();
+      if (/^\d{7}$/.test(codigoValue)) { // Códigos de 7 dígitos
+        console.log('✅ Código real encontrado en Codigo:', codigoValue);
+        return codigoValue;
+      }
+    }
+    
+    // PRIORIDAD 3: Buscar en otros campos posibles
+    const possibleCodeFields = ['MATERIAL', 'Material', 'material', 'CODIGO', 'Codigo', 'codigo'];
+    for (const field of possibleCodeFields) {
+      if (item[field] && typeof item[field] === 'string') {
+        const fieldValue = item[field].trim();
+        if (/^\d{7}$/.test(fieldValue)) {
+          console.log('✅ Código real encontrado en campo:', field, '=', fieldValue);
+          return fieldValue;
+        }
+      }
+    }
+    
+    // ÚLTIMO RECURSO: Generar código fallback solo si no hay código real
     const fallbackCode = `1${String(index).padStart(6, '0')}`;
-    console.log('⚠️ Usando código fallback:', fallbackCode);
+    console.log('⚠️ No se encontró código real, usando fallback:', fallbackCode);
     return fallbackCode;
   };
 
@@ -180,14 +196,14 @@ const Index = () => {
         };
       });
 
-      // FILAS DE DATOS - MAPPING EXACTO
+      // FILAS DE DATOS - MAPPING EXACTO CON CÓDIGOS REALES
       excelData.forEach((item, index) => {
-        const materialCode = getMaterialCode(item, index);  // CÓDIGO NUMÉRICO
+        const materialCode = getMaterialCode(item, index);  // CÓDIGO NUMÉRICO REAL
         const productName = getProductName(item);           // DESCRIPCIÓN COMPLETA
         const unit = getUnit(item);                         // UNIDAD
         const stock = Number(item.Stock) || 0;              // STOCK
         
-        console.log('📊 Exportando fila:', {
+        console.log('📊 Exportando fila con código real:', {
           materialCode,    // Columna MATERIAL
           productName,     // Columna PRODUCTO  
           unit,           // Columna UMB
@@ -195,7 +211,7 @@ const Index = () => {
         });
         
         const dataRow = worksheet.addRow([
-          materialCode,     // MATERIAL = Código numérico
+          materialCode,     // MATERIAL = Código numérico REAL
           productName,      // PRODUCTO = Descripción completa
           unit,            // UMB = Unidad
           stock            // STOCK = Cantidad
@@ -250,11 +266,11 @@ const Index = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      console.log('✅ Archivo generado con mapping exacto');
+      console.log('✅ Archivo generado con códigos reales del Excel');
 
       toast({
         title: "✅ Archivo exportado correctamente",
-        description: `${exportFileName} con formato exacto y ${excelData.length} productos`,
+        description: `${exportFileName} con códigos reales y ${excelData.length} productos`,
       });
 
     } catch (error) {
