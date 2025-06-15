@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,32 +24,58 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función para generar código del material a partir del nombre
+  // Función para generar código del material a partir del nombre - CORREGIDA
   const getMaterialCode = useCallback((product: any) => {
     // Si existe un campo específico de código, usarlo
     if (product.Codigo || product.Code) {
       return product.Codigo || product.Code;
     }
     
-    // Si no, generar un código a partir del nombre del material
+    // Generar un código a partir del nombre del material
     const materialName = product.Material || 'MATERIAL';
     
-    // Generar código tomando las primeras letras de cada palabra importante
-    const words = materialName.split(' ');
+    // Limpiar y dividir en palabras
+    const words = materialName.toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, '') // Eliminar caracteres especiales
+      .split(' ')
+      .filter(word => word.length > 0);
+    
     let code = '';
     
-    // Tomar las primeras 2-3 letras de las primeras palabras importantes
-    for (let i = 0; i < Math.min(3, words.length); i++) {
+    // Estrategia 1: Tomar primeras 2-3 letras de palabras importantes
+    for (let i = 0; i < Math.min(2, words.length); i++) {
       const word = words[i];
-      if (word.length > 2 && !['DE', 'DEL', 'LA', 'EL', 'Y', 'CON'].includes(word)) {
-        code += word.substring(0, Math.min(3, word.length));
+      // Evitar palabras comunes en español
+      if (!['DE', 'DEL', 'LA', 'EL', 'Y', 'CON', 'PARA', 'SIN', 'CON'].includes(word)) {
+        if (word.length >= 3) {
+          code += word.substring(0, 3);
+        } else {
+          code += word;
+        }
       }
     }
     
-    // Si el código es muy corto, usar las primeras letras del material completo
-    if (code.length < 4) {
-      code = materialName.replace(/[^A-Z0-9]/g, '').substring(0, 8);
+    // Si el código es muy corto, agregar más caracteres
+    if (code.length < 4 && words.length > 2) {
+      const thirdWord = words[2];
+      if (thirdWord && !['DE', 'DEL', 'LA', 'EL', 'Y', 'CON'].includes(thirdWord)) {
+        code += thirdWord.substring(0, 2);
+      }
     }
+    
+    // Si aún es muy corto, usar estrategia diferente
+    if (code.length < 3) {
+      // Tomar primeras letras de todas las palabras
+      code = words.map(word => word.charAt(0)).join('');
+      
+      // Si sigue siendo corto, tomar más letras de la primera palabra
+      if (code.length < 4 && words[0]) {
+        code = words[0].substring(0, 4);
+      }
+    }
+    
+    // Limitar longitud máxima
+    code = code.substring(0, 8);
     
     return code || 'MAT';
   }, []);
