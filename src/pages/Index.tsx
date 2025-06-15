@@ -46,7 +46,32 @@ const Index = () => {
 
   // Funciones para mapear correctamente los datos
   const getMaterialCode = (item: any) => {
-    return item.Codigo || item.Code || 'N/A';
+    // Si existe un campo específico de código, usarlo
+    if (item.Codigo || item.Code) {
+      return item.Codigo || item.Code;
+    }
+    
+    // Si no, generar un código a partir del nombre del material
+    const materialName = item.Material || 'MATERIAL';
+    
+    // Generar código tomando las primeras letras de cada palabra importante
+    const words = materialName.split(' ');
+    let code = '';
+    
+    // Tomar las primeras 2-3 letras de las primeras palabras importantes
+    for (let i = 0; i < Math.min(3, words.length); i++) {
+      const word = words[i];
+      if (word.length > 2 && !['DE', 'DEL', 'LA', 'EL', 'Y', 'CON'].includes(word)) {
+        code += word.substring(0, Math.min(3, word.length));
+      }
+    }
+    
+    // Si el código es muy corto, usar las primeras letras del material completo
+    if (code.length < 4) {
+      code = materialName.replace(/[^A-Z0-9]/g, '').substring(0, 8);
+    }
+    
+    return code || 'MAT';
   };
 
   const getProductName = (item: any) => {

@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,10 +25,34 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función para obtener el código del material
+  // Función para generar código del material a partir del nombre
   const getMaterialCode = useCallback((product: any) => {
-    // Buscar en diferentes campos posibles para el código
-    return product.Codigo || product.Code || product.Material || 'N/A';
+    // Si existe un campo específico de código, usarlo
+    if (product.Codigo || product.Code) {
+      return product.Codigo || product.Code;
+    }
+    
+    // Si no, generar un código a partir del nombre del material
+    const materialName = product.Material || 'MATERIAL';
+    
+    // Generar código tomando las primeras letras de cada palabra importante
+    const words = materialName.split(' ');
+    let code = '';
+    
+    // Tomar las primeras 2-3 letras de las primeras palabras importantes
+    for (let i = 0; i < Math.min(3, words.length); i++) {
+      const word = words[i];
+      if (word.length > 2 && !['DE', 'DEL', 'LA', 'EL', 'Y', 'CON'].includes(word)) {
+        code += word.substring(0, Math.min(3, word.length));
+      }
+    }
+    
+    // Si el código es muy corto, usar las primeras letras del material completo
+    if (code.length < 4) {
+      code = materialName.replace(/[^A-Z0-9]/g, '').substring(0, 8);
+    }
+    
+    return code || 'MAT';
   }, []);
 
   // Función para obtener el nombre del producto
@@ -195,9 +220,9 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 const productName = getProductName(product);
                 const unit = getUnit(product);
                 
-                console.log('🔍 Producto corregido:', {
+                console.log('🔍 Producto con código generado:', {
                   originalMaterial: product.Material,
-                  materialCode,
+                  generatedCode: materialCode,
                   productName,
                   unit,
                   stock: displayStock
