@@ -15,8 +15,19 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   
-  // Debug: Log para ver la estructura real en móvil
-  console.log('📱 MÓVIL - Estructura de datos completa:', JSON.stringify(data.slice(0, 2), null, 2));
+  // DEPURACIÓN EXTREMA - Comparar datos completos
+  console.log('🔍 DEPURACIÓN COMPLETA - Total productos:', data.length);
+  console.log('🔍 User Agent:', navigator.userAgent);
+  console.log('🔍 Es móvil?', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+  
+  if (data.length > 0) {
+    console.log('🔍 PRIMER PRODUCTO COMPLETO:', JSON.stringify(data[0], null, 2));
+    console.log('🔍 TODOS LOS CAMPOS del primer producto:', Object.keys(data[0]));
+    console.log('🔍 VALORES de cada campo:');
+    Object.entries(data[0]).forEach(([key, value]) => {
+      console.log(`   ${key}: "${value}" (tipo: ${typeof value})`);
+    });
+  }
   
   // Generar IDs únicos para cada producto
   const productsWithIds = useMemo(() => {
@@ -27,65 +38,57 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función SIMPLIFICADA para obtener el código - SIN REGEX COMPLEJO
+  // Función SIMPLIFICADA para obtener código - DIRECTA
   const getMaterialCode = useCallback((product: any) => {
-    console.log('📱 MÓVIL - Producto completo:', product);
+    console.log('🔍 ANÁLISIS DE CÓDIGO - Producto:', product);
     
-    // ESTRATEGIA SIMPLE: Buscar directamente en los campos más probables
-    const fieldsToCheck = ['Material', 'MATERIAL', 'Codigo', 'CODIGO'];
+    // Listar TODOS los campos y sus valores
+    Object.entries(product).forEach(([key, value]) => {
+      console.log(`🔍 Campo "${key}": "${value}" (${typeof value})`);
+    });
     
-    for (const field of fieldsToCheck) {
-      const value = product[field];
-      if (value !== undefined && value !== null) {
-        const stringValue = String(value).trim();
-        console.log(`📱 MÓVIL - Campo ${field}: "${stringValue}"`);
+    // Buscar campo que contenga exactamente 7 dígitos
+    const allFields = Object.entries(product);
+    
+    for (const [fieldName, fieldValue] of allFields) {
+      if (fieldValue !== undefined && fieldValue !== null) {
+        const stringValue = String(fieldValue).trim();
+        console.log(`🔍 Analizando campo "${fieldName}": "${stringValue}"`);
         
-        // Si es exactamente 7 dígitos, lo devolvemos
-        if (stringValue.length === 7 && /^\d+$/.test(stringValue)) {
-          console.log(`✅ MÓVIL - Código de 7 dígitos encontrado: ${stringValue}`);
-          return stringValue;
-        }
-        
-        // Si contiene 7 dígitos consecutivos, extraerlos
-        const match = stringValue.match(/\d{7}/);
-        if (match) {
-          console.log(`✅ MÓVIL - Código extraído: ${match[0]}`);
-          return match[0];
+        // Buscar cualquier secuencia de exactamente 7 dígitos
+        const matches = stringValue.match(/\d{7}/g);
+        if (matches && matches.length > 0) {
+          console.log(`✅ CÓDIGO ENCONTRADO en "${fieldName}": ${matches[0]}`);
+          return matches[0];
         }
       }
     }
     
-    // Si no encontramos nada, crear código basado en índice
-    const fallback = `1${String(product.originalIndex || 0).padStart(6, '0')}`;
-    console.log(`🚨 MÓVIL - Usando código fallback: ${fallback}`);
+    // Si no encontramos nada, usar fallback pero registrarlo
+    const fallback = `ERROR${String(product.originalIndex || 0).padStart(3, '0')}`;
+    console.log(`❌ NO SE ENCONTRÓ CÓDIGO DE 7 DÍGITOS - Usando fallback: ${fallback}`);
     return fallback;
   }, []);
 
-  // Función para obtener el nombre del producto - CORREGIDA
+  // Función para obtener el nombre del producto
   const getProductName = useCallback((product: any) => {
-    console.log('🔍 Buscando nombre en:', product);
-    
-    // Buscar en todos los campos posibles para el nombre del producto
     const possibleNameFields = [
       'PRODUCTO', 'Producto', 'producto',
       'DESCRIPCION', 'Descripcion', 'descripcion',
       'DESCRIPTION', 'Description', 'description',
-      'NOMBRE', 'Nombre', 'nombre', 'Name', 'name',
-      'MATERIAL', 'Material', 'material' // A veces el material contiene la descripción
+      'NOMBRE', 'Nombre', 'nombre', 'Name', 'name'
     ];
     
     for (const field of possibleNameFields) {
       if (product[field] && typeof product[field] === 'string' && product[field].trim()) {
-        console.log('✅ Nombre encontrado en campo:', field, '=', product[field]);
         return product[field].trim();
       }
     }
     
-    console.log('⚠️ No se encontró nombre, usando fallback');
     return 'Sin descripción';
   }, []);
 
-  // Función para obtener la unidad - CORREGIDA
+  // Función para obtener la unidad
   const getUnit = useCallback((product: any) => {
     const possibleUnitFields = [
       'UMB', 'umb', 'Umb',
@@ -250,12 +253,13 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 const isEditing = editingProductId === product.uniqueId;
                 const displayStock = Number(product.Stock || 0);
                 
-                // Obtener los valores usando las funciones simplificadas
+                // Obtener los valores usando las funciones
                 const materialCode = getMaterialCode(product);
                 const productName = getProductName(product);
                 const unit = getUnit(product);
                 
-                console.log('📱 MÓVIL - Fila renderizada:', {
+                console.log('🔍 FILA RENDERIZADA:', {
+                  índice: product.originalIndex,
                   materialCode,
                   productName,
                   unit,
