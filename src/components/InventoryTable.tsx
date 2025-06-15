@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +109,6 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   // Manejar blur del input (cuando pierde el foco)
   const handleInputBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     console.log('👁️ Input perdió foco en iOS');
-    // No auto-guardar en blur para iOS, solo si el usuario toca guardar
   }, []);
 
   // Manejar touch events específicamente para iOS
@@ -203,7 +201,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                           spellCheck={false}
                           style={{
                             WebkitAppearance: 'none',
-                            fontSize: '16px', // Previene zoom en iOS
+                            fontSize: '16px',
                           }}
                         />
                       ) : (
