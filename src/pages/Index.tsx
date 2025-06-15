@@ -20,6 +20,7 @@ const Index = () => {
   const handleDataProcessed = (data: any[], header: any, styles: any, filename?: string) => {
     console.log('Datos procesados:', data.length, 'productos');
     console.log('Muestra:', data.slice(0, 3));
+    console.log('Campos disponibles:', data.length > 0 ? Object.keys(data[0]) : []);
     
     setExcelData(data);
     setOriginalHeader(header);
@@ -43,72 +44,67 @@ const Index = () => {
     });
   };
 
-  // Funciones para mapear correctamente los datos - CORREGIDAS
-  const getMaterialCode = (item: any) => {
-    // Si existe un campo específico de código, usarlo
-    if (item.Codigo || item.Code) {
-      return item.Codigo || item.Code;
-    }
+  // Funciones para mapear correctamente los datos - EXACTAMENTE COMO EN LA TABLA
+  const getMaterialCode = (item: any, index: number) => {
+    console.log('🔍 Buscando código para:', item);
     
-    // Generar un código a partir del nombre del material
-    const materialName = item.Material || 'MATERIAL';
+    // Buscar en todos los campos posibles para el código
+    const possibleCodeFields = [
+      'MATERIAL', 'Material', 'material',
+      'CODIGO', 'Codigo', 'codigo', 'Code', 'code',
+      'ID', 'id', 'Id'
+    ];
     
-    // Limpiar y dividir en palabras
-    const words = materialName.toUpperCase()
-      .replace(/[^A-Z0-9\s]/g, '') // Eliminar caracteres especiales
-      .split(' ')
-      .filter(word => word.length > 0);
-    
-    let code = '';
-    
-    // Estrategia 1: Tomar primeras 2-3 letras de palabras importantes
-    for (let i = 0; i < Math.min(2, words.length); i++) {
-      const word = words[i];
-      // Evitar palabras comunes en español
-      if (!['DE', 'DEL', 'LA', 'EL', 'Y', 'CON', 'PARA', 'SIN', 'CON'].includes(word)) {
-        if (word.length >= 3) {
-          code += word.substring(0, 3);
-        } else {
-          code += word;
-        }
+    for (const field of possibleCodeFields) {
+      if (item[field] && typeof item[field] === 'string' && /^\d+$/.test(item[field])) {
+        console.log('✅ Código encontrado:', field, '=', item[field]);
+        return item[field];
       }
     }
     
-    // Si el código es muy corto, agregar más caracteres
-    if (code.length < 4 && words.length > 2) {
-      const thirdWord = words[2];
-      if (thirdWord && !['DE', 'DEL', 'LA', 'EL', 'Y', 'CON'].includes(thirdWord)) {
-        code += thirdWord.substring(0, 2);
-      }
-    }
-    
-    // Si aún es muy corto, usar estrategia diferente
-    if (code.length < 3) {
-      // Tomar primeras letras de todas las palabras
-      code = words.map(word => word.charAt(0)).join('');
-      
-      // Si sigue siendo corto, tomar más letras de la primera palabra
-      if (code.length < 4 && words[0]) {
-        code = words[0].substring(0, 4);
-      }
-    }
-    
-    // Limitar longitud máxima
-    code = code.substring(0, 8);
-    
-    return code || 'MAT';
+    // Si no hay código numérico, usar el índice + 1000000 como fallback
+    const fallbackCode = `1${String(index).padStart(6, '0')}`;
+    console.log('⚠️ Usando código fallback:', fallbackCode);
+    return fallbackCode;
   };
 
   const getProductName = (item: any) => {
-    return item.Material || item.Descripción || item.Description || 'Sin descripción';
+    // Buscar en todos los campos posibles para el nombre del producto
+    const possibleNameFields = [
+      'PRODUCTO', 'Producto', 'producto',
+      'DESCRIPCION', 'Descripcion', 'descripcion',
+      'DESCRIPTION', 'Description', 'description',
+      'NOMBRE', 'Nombre', 'nombre', 'Name', 'name',
+      'MATERIAL', 'Material', 'material' // A veces el material contiene la descripción
+    ];
+    
+    for (const field of possibleNameFields) {
+      if (item[field] && typeof item[field] === 'string' && item[field].trim()) {
+        return item[field].trim();
+      }
+    }
+    
+    return 'Sin descripción';
   };
 
   const getUnit = (item: any) => {
-    return item.Producto || item.UMB || item.Unidad || item.Unit || 'UN';
+    const possibleUnitFields = [
+      'UMB', 'umb', 'Umb',
+      'UNIDAD', 'Unidad', 'unidad', 'Unit', 'unit',
+      'UM', 'um', 'Um'
+    ];
+    
+    for (const field of possibleUnitFields) {
+      if (item[field] && typeof item[field] === 'string' && item[field].trim()) {
+        return item[field].trim();
+      }
+    }
+    
+    return 'UN';
   };
 
   const exportExcel = async () => {
-    console.log('=== EXPORTACIÓN CON EXCELJS CORREGIDA ===');
+    console.log('=== EXPORTACIÓN CORREGIDA - COLUMNAS EXACTAS ===');
     
     if (excelData.length === 0) {
       toast({
@@ -124,7 +120,7 @@ const Index = () => {
       const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
                      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
       const mesActual = meses[new Date().getMonth()];
-      const tituloCompleto = `INVENTARIO BARES ${mesActual}`;
+      const tituloCompleto = `INVENTARIO BARES ${mesActual} ${new Date().getFullYear()}`;
 
       // Crear workbook y worksheet
       const workbook = new ExcelJS.Workbook();
@@ -159,7 +155,7 @@ const Index = () => {
       // FILA 2: Vacía
       worksheet.addRow(['', '', '', '']);
 
-      // FILA 3: Encabezados de columnas
+      // FILA 3: Encabezados de columnas EXACTOS
       const headerRow = worksheet.addRow(['MATERIAL', 'PRODUCTO', 'UMB', 'STOCK']);
       headerRow.eachCell((cell) => {
         cell.font = { 
@@ -184,19 +180,31 @@ const Index = () => {
         };
       });
 
-      // FILAS DE DATOS - CORREGIDAS
-      excelData.forEach(item => {
+      // FILAS DE DATOS - MAPPING EXACTO
+      excelData.forEach((item, index) => {
+        const materialCode = getMaterialCode(item, index);  // CÓDIGO NUMÉRICO
+        const productName = getProductName(item);           // DESCRIPCIÓN COMPLETA
+        const unit = getUnit(item);                         // UNIDAD
+        const stock = Number(item.Stock) || 0;              // STOCK
+        
+        console.log('📊 Exportando fila:', {
+          materialCode,    // Columna MATERIAL
+          productName,     // Columna PRODUCTO  
+          unit,           // Columna UMB
+          stock           // Columna STOCK
+        });
+        
         const dataRow = worksheet.addRow([
-          getMaterialCode(item),     // Códigos en columna Material
-          getProductName(item),      // Nombres en columna Producto  
-          getUnit(item),             // Unidades en columna UMB
-          Number(item.Stock) || 0    // Stock en columna Stock
+          materialCode,     // MATERIAL = Código numérico
+          productName,      // PRODUCTO = Descripción completa
+          unit,            // UMB = Unidad
+          stock            // STOCK = Cantidad
         ]);
         
         dataRow.eachCell((cell, colNumber) => {
           cell.font = { name: 'Arial' };
           cell.alignment = { 
-            horizontal: colNumber === 2 ? 'left' : 'center', // Producto alineado a la izquierda
+            horizontal: colNumber === 2 ? 'left' : 'center', // PRODUCTO alineado a la izquierda
             vertical: 'middle' 
           };
           cell.border = {
@@ -210,7 +218,7 @@ const Index = () => {
 
       // Configurar anchos de columna
       worksheet.getColumn('A').width = 15; // MATERIAL
-      worksheet.getColumn('B').width = 40; // PRODUCTO
+      worksheet.getColumn('B').width = 50; // PRODUCTO
       worksheet.getColumn('C').width = 8;  // UMB
       worksheet.getColumn('D').width = 12; // STOCK
 
@@ -242,11 +250,11 @@ const Index = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      console.log('✅ Archivo generado con ExcelJS');
+      console.log('✅ Archivo generado con mapping exacto');
 
       toast({
         title: "✅ Archivo exportado correctamente",
-        description: `${exportFileName} con formato profesional y ${excelData.length} productos`,
+        description: `${exportFileName} con formato exacto y ${excelData.length} productos`,
       });
 
     } catch (error) {

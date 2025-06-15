@@ -15,6 +15,10 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   
+  // Debug: Log the first few items to see the actual structure
+  console.log('🔍 Estructura de datos:', data.slice(0, 3));
+  console.log('🔍 Campos disponibles:', data.length > 0 ? Object.keys(data[0]) : []);
+  
   // Generar IDs únicos para cada producto
   const productsWithIds = useMemo(() => {
     return data.map((item, index) => ({
@@ -24,72 +28,69 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función para generar código del material a partir del nombre - CORREGIDA
+  // Función para obtener el código del material - CORREGIDA COMPLETAMENTE
   const getMaterialCode = useCallback((product: any) => {
-    // Si existe un campo específico de código, usarlo
-    if (product.Codigo || product.Code) {
-      return product.Codigo || product.Code;
-    }
+    console.log('🔍 Producto completo:', product);
     
-    // Generar un código a partir del nombre del material
-    const materialName = product.Material || 'MATERIAL';
+    // Buscar en todos los campos posibles para el código
+    const possibleCodeFields = [
+      'MATERIAL', 'Material', 'material',
+      'CODIGO', 'Codigo', 'codigo', 'Code', 'code',
+      'ID', 'id', 'Id'
+    ];
     
-    // Limpiar y dividir en palabras
-    const words = materialName.toUpperCase()
-      .replace(/[^A-Z0-9\s]/g, '') // Eliminar caracteres especiales
-      .split(' ')
-      .filter(word => word.length > 0);
-    
-    let code = '';
-    
-    // Estrategia 1: Tomar primeras 2-3 letras de palabras importantes
-    for (let i = 0; i < Math.min(2, words.length); i++) {
-      const word = words[i];
-      // Evitar palabras comunes en español
-      if (!['DE', 'DEL', 'LA', 'EL', 'Y', 'CON', 'PARA', 'SIN', 'CON'].includes(word)) {
-        if (word.length >= 3) {
-          code += word.substring(0, 3);
-        } else {
-          code += word;
-        }
+    for (const field of possibleCodeFields) {
+      if (product[field] && typeof product[field] === 'string' && /^\d+$/.test(product[field])) {
+        console.log('✅ Código encontrado en campo:', field, '=', product[field]);
+        return product[field];
       }
     }
     
-    // Si el código es muy corto, agregar más caracteres
-    if (code.length < 4 && words.length > 2) {
-      const thirdWord = words[2];
-      if (thirdWord && !['DE', 'DEL', 'LA', 'EL', 'Y', 'CON'].includes(thirdWord)) {
-        code += thirdWord.substring(0, 2);
-      }
-    }
-    
-    // Si aún es muy corto, usar estrategia diferente
-    if (code.length < 3) {
-      // Tomar primeras letras de todas las palabras
-      code = words.map(word => word.charAt(0)).join('');
-      
-      // Si sigue siendo corto, tomar más letras de la primera palabra
-      if (code.length < 4 && words[0]) {
-        code = words[0].substring(0, 4);
-      }
-    }
-    
-    // Limitar longitud máxima
-    code = code.substring(0, 8);
-    
-    return code || 'MAT';
+    // Si no hay código numérico, usar el índice + 1000000 como fallback
+    const fallbackCode = `1${String(product.originalIndex || 0).padStart(6, '0')}`;
+    console.log('⚠️ Usando código fallback:', fallbackCode);
+    return fallbackCode;
   }, []);
 
-  // Función para obtener el nombre del producto
+  // Función para obtener el nombre del producto - CORREGIDA
   const getProductName = useCallback((product: any) => {
-    // El nombre del producto está en Material (según los logs)
-    return product.Material || product.Descripción || product.Description || product.Producto || 'Sin descripción';
+    console.log('🔍 Buscando nombre en:', product);
+    
+    // Buscar en todos los campos posibles para el nombre del producto
+    const possibleNameFields = [
+      'PRODUCTO', 'Producto', 'producto',
+      'DESCRIPCION', 'Descripcion', 'descripcion',
+      'DESCRIPTION', 'Description', 'description',
+      'NOMBRE', 'Nombre', 'nombre', 'Name', 'name',
+      'MATERIAL', 'Material', 'material' // A veces el material contiene la descripción
+    ];
+    
+    for (const field of possibleNameFields) {
+      if (product[field] && typeof product[field] === 'string' && product[field].trim()) {
+        console.log('✅ Nombre encontrado en campo:', field, '=', product[field]);
+        return product[field].trim();
+      }
+    }
+    
+    console.log('⚠️ No se encontró nombre, usando fallback');
+    return 'Sin descripción';
   }, []);
 
-  // Función para obtener la unidad
+  // Función para obtener la unidad - CORREGIDA
   const getUnit = useCallback((product: any) => {
-    // La unidad está en Producto (según los logs) o UMB
-    return product.Producto || product.UMB || product.Unidad || product.Unit || 'UN';
+    const possibleUnitFields = [
+      'UMB', 'umb', 'Umb',
+      'UNIDAD', 'Unidad', 'unidad', 'Unit', 'unit',
+      'UM', 'um', 'Um'
+    ];
+    
+    for (const field of possibleUnitFields) {
+      if (product[field] && typeof product[field] === 'string' && product[field].trim()) {
+        return product[field].trim();
+      }
+    }
+    
+    return 'UN';
   }, []);
 
   // Función para enfocar el input en iOS
@@ -106,7 +107,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   }, []);
 
   const startEdit = useCallback((productId: string, currentStock: number) => {
-    console.log('🔧 INICIO EDICIÓN - iOS');
+    console.log('🔧 INICIO EDICIÓN');
     console.log('Product ID:', productId);
     console.log('Stock actual:', currentStock);
     
@@ -118,7 +119,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   }, [focusInput]);
 
   const saveEdit = useCallback(() => {
-    console.log('💾 GUARDANDO - iOS');
+    console.log('💾 GUARDANDO');
     console.log('Product ID editando:', editingProductId);
     console.log('Nuevo valor:', editValue);
     
@@ -147,7 +148,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   }, [editingProductId, editValue, onUpdateStock, productsWithIds]);
 
   const cancelEdit = useCallback(() => {
-    console.log('❌ CANCELANDO EDICIÓN - iOS');
+    console.log('❌ CANCELANDO EDICIÓN');
     setEditingProductId(null);
     setEditValue('');
   }, []);
@@ -170,27 +171,27 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   // Manejar cambios en el input con validación
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    console.log('📝 Cambio input iOS:', value);
+    console.log('📝 Cambio input:', value);
     setEditValue(value);
   }, []);
 
   // Manejar blur del input (cuando pierde el foco)
   const handleInputBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    console.log('👁️ Input perdió foco en iOS');
+    console.log('👁️ Input perdió foco');
   }, []);
 
   // Manejar touch events específicamente para iOS
   const handleSaveTouch = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('👆 Touch save iOS');
+    console.log('👆 Touch save');
     saveEdit();
   }, [saveEdit]);
 
   const handleCancelTouch = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('👆 Touch cancel iOS');
+    console.log('👆 Touch cancel');
     cancelEdit();
   }, [cancelEdit]);
 
@@ -198,7 +199,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     return (e: React.TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      console.log('👆 Touch edit iOS');
+      console.log('👆 Touch edit');
       startEdit(productId, currentStock);
     };
   }, [startEdit]);
@@ -228,10 +229,10 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-24">Material</TableHead>
-                <TableHead className="min-w-[200px]">Producto</TableHead>
+                <TableHead className="w-32">MATERIAL</TableHead>
+                <TableHead className="min-w-[300px]">PRODUCTO</TableHead>
                 <TableHead className="w-20">UMB</TableHead>
-                <TableHead className="w-32">Stock</TableHead>
+                <TableHead className="w-32">STOCK</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -240,30 +241,29 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 const isEditing = editingProductId === product.uniqueId;
                 const displayStock = Number(product.Stock || 0);
                 
-                // Obtener los valores correctos para cada columna
-                const materialCode = getMaterialCode(product);
-                const productName = getProductName(product);
-                const unit = getUnit(product);
+                // Obtener los valores correctos EXACTAMENTE como en el Excel original
+                const materialCode = getMaterialCode(product);  // Código numérico en MATERIAL
+                const productName = getProductName(product);    // Descripción en PRODUCTO
+                const unit = getUnit(product);                  // Unidad en UMB
                 
-                console.log('🔍 Producto con código generado:', {
-                  originalMaterial: product.Material,
-                  generatedCode: materialCode,
-                  productName,
-                  unit,
+                console.log('🏗️ Fila renderizada:', {
+                  materialCode,    // Debe ser código numérico
+                  productName,     // Debe ser descripción completa
+                  unit,           // Debe ser la unidad
                   stock: displayStock
                 });
                 
                 return (
                   <TableRow key={product.uniqueId}>
-                    <TableCell className="font-mono text-sm">
+                    <TableCell className="font-mono text-sm font-bold">
                       {materialCode}
                     </TableCell>
-                    <TableCell className="font-medium max-w-[200px]">
+                    <TableCell className="font-medium max-w-[300px]">
                       <div className="truncate" title={productName}>
                         {productName}
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center font-semibold">
                       {unit}
                     </TableCell>
                     <TableCell>
