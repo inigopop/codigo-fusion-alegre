@@ -44,66 +44,38 @@ const Index = () => {
     });
   };
 
-  // Funciones para mapear correctamente los datos - MEJORADA PARA CÓDIGOS DE 7 DÍGITOS
+  // Función SIMPLIFICADA para obtener el código - IGUAL QUE EN InventoryTable
   const getMaterialCode = (item: any, index: number) => {
-    console.log('🔍 EXPORTACIÓN - BUSCANDO CÓDIGO DE 7 DÍGITOS:', item);
-    console.log('🔍 Todos los campos:', Object.keys(item));
-    console.log('🔍 Valores de campos clave:', {
-      Material: item.Material,
-      Codigo: item.Codigo,
-      MATERIAL: item.MATERIAL,
-      CODIGO: item.CODIGO
-    });
+    console.log('📱 EXPORTACIÓN - Producto completo:', item);
     
-    // Lista de todos los campos posibles donde puede estar el código
-    const possibleCodeFields = [
-      'Material', 'MATERIAL', 'material',
-      'Codigo', 'CODIGO', 'codigo', 
-      'Code', 'CODE', 'code',
-      'SKU', 'sku', 'Sku',
-      'ID', 'id', 'Id'
-    ];
+    // ESTRATEGIA SIMPLE: Buscar directamente en los campos más probables
+    const fieldsToCheck = ['Material', 'MATERIAL', 'Codigo', 'CODIGO'];
     
-    // Buscar en cada campo posible
-    for (const field of possibleCodeFields) {
-      if (item[field] !== undefined && item[field] !== null) {
-        const fieldValue = String(item[field]).trim();
-        console.log(`🔍 EXPORTACIÓN - Revisando campo "${field}":`, fieldValue);
+    for (const field of fieldsToCheck) {
+      const value = item[field];
+      if (value !== undefined && value !== null) {
+        const stringValue = String(value).trim();
+        console.log(`📱 EXPORTACIÓN - Campo ${field}: "${stringValue}"`);
         
-        // Buscar códigos de exactamente 7 dígitos
-        const sevenDigitMatch = fieldValue.match(/\b\d{7}\b/);
-        if (sevenDigitMatch) {
-          console.log('✅ EXPORTACIÓN - CÓDIGO DE 7 DÍGITOS ENCONTRADO:', sevenDigitMatch[0], 'en campo:', field);
-          return sevenDigitMatch[0];
+        // Si es exactamente 7 dígitos, lo devolvemos
+        if (stringValue.length === 7 && /^\d+$/.test(stringValue)) {
+          console.log(`✅ EXPORTACIÓN - Código de 7 dígitos encontrado: ${stringValue}`);
+          return stringValue;
         }
         
-        // También verificar si todo el campo es un código de 7 dígitos
-        if (/^\d{7}$/.test(fieldValue)) {
-          console.log('✅ EXPORTACIÓN - CAMPO COMPLETO ES CÓDIGO DE 7 DÍGITOS:', fieldValue, 'en campo:', field);
-          return fieldValue;
+        // Si contiene 7 dígitos consecutivos, extraerlos
+        const match = stringValue.match(/\d{7}/);
+        if (match) {
+          console.log(`✅ EXPORTACIÓN - Código extraído: ${match[0]}`);
+          return match[0];
         }
       }
     }
     
-    // Si no encuentra código de 7 dígitos, buscar cualquier código numérico
-    for (const field of possibleCodeFields) {
-      if (item[field] !== undefined && item[field] !== null) {
-        const fieldValue = String(item[field]).trim();
-        
-        // Buscar cualquier secuencia de dígitos de 4 o más caracteres
-        const anyNumberMatch = fieldValue.match(/\b\d{4,}\b/);
-        if (anyNumberMatch) {
-          console.log('⚠️ EXPORTACIÓN - CÓDIGO ALTERNATIVO ENCONTRADO (no es 7 dígitos):', anyNumberMatch[0], 'en campo:', field);
-          return anyNumberMatch[0];
-        }
-      }
-    }
-    
-    // ÚLTIMO RECURSO: Generar código fallback
-    const fallbackCode = `1${String(index).padStart(6, '0')}`;
-    console.log('🚨 EXPORTACIÓN - NO SE ENCONTRÓ CÓDIGO REAL, usando fallback:', fallbackCode);
-    console.log('🚨 EXPORTACIÓN - Producto completo:', item);
-    return fallbackCode;
+    // Si no encontramos nada, crear código basado en índice
+    const fallback = `1${String(index).padStart(6, '0')}`;
+    console.log(`🚨 EXPORTACIÓN - Usando código fallback: ${fallback}`);
+    return fallback;
   };
 
   const getProductName = (item: any) => {

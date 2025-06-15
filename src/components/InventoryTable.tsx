@@ -15,9 +15,8 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
   
-  // Debug: Log the first few items to see the actual structure
-  console.log('🔍 Estructura de datos:', data.slice(0, 3));
-  console.log('🔍 Campos disponibles:', data.length > 0 ? Object.keys(data[0]) : []);
+  // Debug: Log para ver la estructura real en móvil
+  console.log('📱 MÓVIL - Estructura de datos completa:', JSON.stringify(data.slice(0, 2), null, 2));
   
   // Generar IDs únicos para cada producto
   const productsWithIds = useMemo(() => {
@@ -28,66 +27,38 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función para obtener el código del material - MEJORADA PARA CÓDIGOS DE 7 DÍGITOS
+  // Función SIMPLIFICADA para obtener el código - SIN REGEX COMPLEJO
   const getMaterialCode = useCallback((product: any) => {
-    console.log('🔍 BUSCANDO CÓDIGO DE 7 DÍGITOS:', product);
-    console.log('🔍 Todos los campos:', Object.keys(product));
-    console.log('🔍 Valores de campos clave:', {
-      Material: product.Material,
-      Codigo: product.Codigo,
-      MATERIAL: product.MATERIAL,
-      CODIGO: product.CODIGO
-    });
+    console.log('📱 MÓVIL - Producto completo:', product);
     
-    // Lista de todos los campos posibles donde puede estar el código
-    const possibleCodeFields = [
-      'Material', 'MATERIAL', 'material',
-      'Codigo', 'CODIGO', 'codigo', 
-      'Code', 'CODE', 'code',
-      'SKU', 'sku', 'Sku',
-      'ID', 'id', 'Id'
-    ];
+    // ESTRATEGIA SIMPLE: Buscar directamente en los campos más probables
+    const fieldsToCheck = ['Material', 'MATERIAL', 'Codigo', 'CODIGO'];
     
-    // Buscar en cada campo posible
-    for (const field of possibleCodeFields) {
-      if (product[field] !== undefined && product[field] !== null) {
-        const fieldValue = String(product[field]).trim();
-        console.log(`🔍 Revisando campo "${field}":`, fieldValue);
+    for (const field of fieldsToCheck) {
+      const value = product[field];
+      if (value !== undefined && value !== null) {
+        const stringValue = String(value).trim();
+        console.log(`📱 MÓVIL - Campo ${field}: "${stringValue}"`);
         
-        // Buscar códigos de exactamente 7 dígitos
-        const sevenDigitMatch = fieldValue.match(/\b\d{7}\b/);
-        if (sevenDigitMatch) {
-          console.log('✅ CÓDIGO DE 7 DÍGITOS ENCONTRADO:', sevenDigitMatch[0], 'en campo:', field);
-          return sevenDigitMatch[0];
+        // Si es exactamente 7 dígitos, lo devolvemos
+        if (stringValue.length === 7 && /^\d+$/.test(stringValue)) {
+          console.log(`✅ MÓVIL - Código de 7 dígitos encontrado: ${stringValue}`);
+          return stringValue;
         }
         
-        // También verificar si todo el campo es un código de 7 dígitos
-        if (/^\d{7}$/.test(fieldValue)) {
-          console.log('✅ CAMPO COMPLETO ES CÓDIGO DE 7 DÍGITOS:', fieldValue, 'en campo:', field);
-          return fieldValue;
+        // Si contiene 7 dígitos consecutivos, extraerlos
+        const match = stringValue.match(/\d{7}/);
+        if (match) {
+          console.log(`✅ MÓVIL - Código extraído: ${match[0]}`);
+          return match[0];
         }
       }
     }
     
-    // Si no encuentra código de 7 dígitos, buscar cualquier código numérico
-    for (const field of possibleCodeFields) {
-      if (product[field] !== undefined && product[field] !== null) {
-        const fieldValue = String(product[field]).trim();
-        
-        // Buscar cualquier secuencia de dígitos de 4 o más caracteres
-        const anyNumberMatch = fieldValue.match(/\b\d{4,}\b/);
-        if (anyNumberMatch) {
-          console.log('⚠️ CÓDIGO ALTERNATIVO ENCONTRADO (no es 7 dígitos):', anyNumberMatch[0], 'en campo:', field);
-          return anyNumberMatch[0];
-        }
-      }
-    }
-    
-    // ÚLTIMO RECURSO: Generar código fallback
-    const fallbackCode = `1${String(product.originalIndex || 0).padStart(6, '0')}`;
-    console.log('🚨 NO SE ENCONTRÓ CÓDIGO REAL, usando fallback:', fallbackCode);
-    console.log('🚨 Producto completo:', product);
-    return fallbackCode;
+    // Si no encontramos nada, crear código basado en índice
+    const fallback = `1${String(product.originalIndex || 0).padStart(6, '0')}`;
+    console.log(`🚨 MÓVIL - Usando código fallback: ${fallback}`);
+    return fallback;
   }, []);
 
   // Función para obtener el nombre del producto - CORREGIDA
@@ -279,15 +250,15 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 const isEditing = editingProductId === product.uniqueId;
                 const displayStock = Number(product.Stock || 0);
                 
-                // Obtener los valores correctos EXACTAMENTE como en el Excel original
-                const materialCode = getMaterialCode(product);  // Código numérico REAL del Excel
-                const productName = getProductName(product);    // Descripción en PRODUCTO
-                const unit = getUnit(product);                  // Unidad en UMB
+                // Obtener los valores usando las funciones simplificadas
+                const materialCode = getMaterialCode(product);
+                const productName = getProductName(product);
+                const unit = getUnit(product);
                 
-                console.log('🏗️ Fila renderizada:', {
-                  materialCode,    // Debe ser código numérico REAL
-                  productName,     // Debe ser descripción completa
-                  unit,           // Debe ser la unidad
+                console.log('📱 MÓVIL - Fila renderizada:', {
+                  materialCode,
+                  productName,
+                  unit,
                   stock: displayStock
                 });
                 
