@@ -44,19 +44,21 @@ const Index = () => {
     });
   };
 
-  // Función DIRECTA para obtener el código - IGUAL que en InventoryTable
-  const getMaterialCode = (item: any, index: number) => {
-    const materialCode = item.Material || item.Codigo;
-    
-    if (materialCode && typeof materialCode === 'string' && materialCode.trim()) {
-      const cleanCode = materialCode.trim();
-      console.log('✅ Exportación - Código directo:', cleanCode);
-      return cleanCode;
+  // Función SIMPLE para obtener el código - IGUAL que en InventoryTable
+  const getMaterialCode = (item: any) => {
+    // Buscar SOLO en campos Material y Codigo directamente
+    if (item.Material && typeof item.Material === 'string') {
+      console.log('✅ Exportación - Material:', item.Material);
+      return item.Material;
     }
     
-    const fallback = `100${String(index).padStart(4, '0')}`;
-    console.log('⚠️ Exportación - Usando fallback:', fallback);
-    return fallback;
+    if (item.Codigo && typeof item.Codigo === 'string') {
+      console.log('✅ Exportación - Código:', item.Codigo);
+      return item.Codigo;
+    }
+    
+    console.error('❌ Exportación - No se encontró Material ni Código');
+    return 'SIN-CODIGO';
   };
 
   const getProductName = (item: any) => {
@@ -146,7 +148,7 @@ const Index = () => {
 
       // FILAS DE DATOS - MAPPING EXACTO CON CÓDIGOS REALES
       excelData.forEach((item, index) => {
-        const materialCode = getMaterialCode(item, index);
+        const materialCode = getMaterialCode(item);
         const productName = getProductName(item);
         const unit = getUnit(item);
         const stock = Number(item.Stock) || 0;

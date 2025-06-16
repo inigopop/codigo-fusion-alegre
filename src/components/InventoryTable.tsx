@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,21 +27,22 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función DIRECTA para obtener código - SIN BUSCAR, DIRECTO
+  // Función SIMPLE para obtener código - SOLO campos directos
   const getMaterialCode = useCallback((product: any) => {
-    // ACCESO DIRECTO a los campos que SABEMOS que tienen el código
-    const materialCode = product.Material || product.Codigo;
-    
-    if (materialCode && typeof materialCode === 'string' && materialCode.trim()) {
-      const cleanCode = materialCode.trim();
-      console.log('✅ Código directo encontrado:', cleanCode);
-      return cleanCode;
+    // Buscar SOLO en campos Material y Codigo directamente
+    if (product.Material && typeof product.Material === 'string') {
+      console.log('✅ Material encontrado:', product.Material);
+      return product.Material;
     }
     
-    // Solo si realmente no hay nada, usar fallback
-    const fallback = `100${String(product.originalIndex || 0).padStart(4, '0')}`;
-    console.log('⚠️ Usando fallback:', fallback);
-    return fallback;
+    if (product.Codigo && typeof product.Codigo === 'string') {
+      console.log('✅ Código encontrado:', product.Codigo);
+      return product.Codigo;
+    }
+    
+    // Si no hay ninguno, mostrar mensaje de error claro
+    console.error('❌ No se encontró Material ni Código para:', product);
+    return 'SIN-CODIGO';
   }, []);
 
   // Función para obtener el nombre del producto
@@ -140,18 +140,19 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
       <CardHeader>
         <CardTitle>Inventario - {filteredProducts.length} de {data.length} productos</CardTitle>
         <div className="flex items-center gap-2 mt-4">
-          <Search className="w-4 h-4" />
+          <Search className="w-4 h-4 flex-shrink-0" />
           <Input
             placeholder="Buscar por código o producto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1"
+            className="flex-1 min-w-0"
           />
           {searchTerm && (
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => setSearchTerm('')}
+              className="flex-shrink-0"
             >
               Limpiar
             </Button>
@@ -163,11 +164,11 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-32">MATERIAL</TableHead>
-                <TableHead className="min-w-[300px]">PRODUCTO</TableHead>
-                <TableHead className="w-20">UMB</TableHead>
-                <TableHead className="w-32">STOCK</TableHead>
-                <TableHead className="w-24">Acciones</TableHead>
+                <TableHead className="w-32 min-w-[120px]">MATERIAL</TableHead>
+                <TableHead className="min-w-[200px]">PRODUCTO</TableHead>
+                <TableHead className="w-20 min-w-[60px]">UMB</TableHead>
+                <TableHead className="w-32 min-w-[100px]">STOCK</TableHead>
+                <TableHead className="w-24 min-w-[100px]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -181,11 +182,11 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 
                 return (
                   <TableRow key={product.uniqueId}>
-                    <TableCell className="font-mono text-sm font-bold">
+                    <TableCell className="font-mono text-sm font-bold break-all">
                       {materialCode}
                     </TableCell>
-                    <TableCell className="font-medium max-w-[300px]">
-                      <div className="truncate" title={productName}>
+                    <TableCell className="font-medium">
+                      <div className="break-words" title={productName}>
                         {productName}
                       </div>
                     </TableCell>

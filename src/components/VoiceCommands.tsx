@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -207,42 +206,48 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     
     console.log('🔍 Procesando comando:', command);
     
-    // Buscar patrones de comandos más flexibles
     const lowerCommand = command.toLowerCase();
     
-    // Patrones mejorados para búsqueda de productos
-    const searchPatterns = [
-      /(?:buscar?|encuentra?|localiza?|mostrar?)\s+(.+)/i,
-      /(.+)\s+(?:stock|cantidad|inventario)/i,
-      /^(.+)$/i // Cualquier texto como búsqueda
-    ];
-    
-    let productQuery = '';
-    for (const pattern of searchPatterns) {
-      const match = lowerCommand.match(pattern);
-      if (match) {
-        productQuery = match[1].trim();
-        break;
-      }
-    }
-    
-    if (productQuery) {
-      searchProduct(productQuery);
-    }
-    
-    // Patrones para actualización de stock
+    // Patrones para actualización de stock - CORREGIDOS
     const updatePatterns = [
+      /(.+?)\s+(\d+(?:\.\d+)?)/i,  // "cerveza 50" o "patatas 25.5"
       /(?:actualizar?|cambiar?|poner?|establecer?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)/i,
-      /(.+?)\s+(?:cantidad|stock|inventario)\s+(\d+(?:\.\d+)?)/i,
-      /(\d+(?:\.\d+)?)\s+(.+)/i
+      /(.+?)\s+(?:cantidad|stock|inventario)\s+(\d+(?:\.\d+)?)/i
     ];
+    
+    let productFound = false;
     
     for (const pattern of updatePatterns) {
       const match = lowerCommand.match(pattern);
       if (match) {
-        const [, product, quantity] = match;
-        updateProductStock(product.trim(), parseFloat(quantity));
-        break;
+        const productQuery = match[1].trim();
+        const quantity = parseFloat(match[2]);
+        
+        console.log('🎯 Comando de actualización detectado:', { productQuery, quantity });
+        
+        if (!isNaN(quantity) && quantity >= 0) {
+          updateProductStock(productQuery, quantity);
+          productFound = true;
+          break;
+        }
+      }
+    }
+    
+    // Si no se encontró un comando de actualización, buscar producto
+    if (!productFound) {
+      const searchPatterns = [
+        /(?:buscar?|encuentra?|localiza?|mostrar?)\s+(.+)/i,
+        /(.+)\s+(?:stock|cantidad|inventario)/i,
+        /^(.+)$/i // Cualquier texto como búsqueda
+      ];
+      
+      for (const pattern of searchPatterns) {
+        const match = lowerCommand.match(pattern);
+        if (match) {
+          const productQuery = match[1].trim();
+          searchProduct(productQuery);
+          break;
+        }
       }
     }
     
@@ -253,12 +258,14 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     const results = excelData.filter(item => {
       const productName = (item.Producto || '').toLowerCase();
       const material = (item.Material || '').toLowerCase();
+      const codigo = (item.Codigo || '').toLowerCase();
       const searchQuery = query.toLowerCase();
       
       return productName.includes(searchQuery) || 
              material.includes(searchQuery) ||
+             codigo.includes(searchQuery) ||
              searchQuery.split(' ').some(word => 
-               productName.includes(word) || material.includes(word)
+               productName.includes(word) || material.includes(word) || codigo.includes(word)
              );
     });
 
@@ -281,20 +288,27 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   };
 
   const updateProductStock = (productQuery: string, newStock: number) => {
+    console.log('🔄 Intentando actualizar stock:', { productQuery, newStock });
+    
     const productIndex = excelData.findIndex(item => {
       const productName = (item.Producto || '').toLowerCase();
       const material = (item.Material || '').toLowerCase();
+      const codigo = (item.Codigo || '').toLowerCase();
       const query = productQuery.toLowerCase();
       
       return productName.includes(query) || 
              material.includes(query) ||
+             codigo.includes(query) ||
              query.split(' ').some(word => 
-               productName.includes(word) || material.includes(word)
+               productName.includes(word) || material.includes(word) || codigo.includes(word)
              );
     });
 
     if (productIndex !== -1) {
       const product = excelData[productIndex];
+      console.log('✅ Producto encontrado para actualizar:', product.Producto, 'en índice:', productIndex);
+      
+      // LLAMAR A LA FUNCIÓN CORRECTA CON EL ÍNDICE
       onUpdateStock(productIndex, newStock);
       
       speak(`Stock actualizado: ${product.Producto} ahora tiene ${newStock} ${product.UMB}`);
