@@ -44,73 +44,27 @@ const Index = () => {
     });
   };
 
-  // Función SIMPLIFICADA para obtener el código - IGUAL QUE EN InventoryTable
+  // Función DIRECTA para obtener el código - IGUAL que en InventoryTable
   const getMaterialCode = (item: any, index: number) => {
-    console.log('📱 EXPORTACIÓN - Producto completo:', item);
+    const materialCode = item.Material || item.Codigo;
     
-    // ESTRATEGIA SIMPLE: Buscar directamente en los campos más probables
-    const fieldsToCheck = ['Material', 'MATERIAL', 'Codigo', 'CODIGO'];
-    
-    for (const field of fieldsToCheck) {
-      const value = item[field];
-      if (value !== undefined && value !== null) {
-        const stringValue = String(value).trim();
-        console.log(`📱 EXPORTACIÓN - Campo ${field}: "${stringValue}"`);
-        
-        // Si es exactamente 7 dígitos, lo devolvemos
-        if (stringValue.length === 7 && /^\d+$/.test(stringValue)) {
-          console.log(`✅ EXPORTACIÓN - Código de 7 dígitos encontrado: ${stringValue}`);
-          return stringValue;
-        }
-        
-        // Si contiene 7 dígitos consecutivos, extraerlos
-        const match = stringValue.match(/\d{7}/);
-        if (match) {
-          console.log(`✅ EXPORTACIÓN - Código extraído: ${match[0]}`);
-          return match[0];
-        }
-      }
+    if (materialCode && typeof materialCode === 'string' && materialCode.trim()) {
+      const cleanCode = materialCode.trim();
+      console.log('✅ Exportación - Código directo:', cleanCode);
+      return cleanCode;
     }
     
-    // Si no encontramos nada, crear código basado en índice
-    const fallback = `1${String(index).padStart(6, '0')}`;
-    console.log(`🚨 EXPORTACIÓN - Usando código fallback: ${fallback}`);
+    const fallback = `100${String(index).padStart(4, '0')}`;
+    console.log('⚠️ Exportación - Usando fallback:', fallback);
     return fallback;
   };
 
   const getProductName = (item: any) => {
-    // Buscar en todos los campos posibles para el nombre del producto
-    const possibleNameFields = [
-      'PRODUCTO', 'Producto', 'producto',
-      'DESCRIPCION', 'Descripcion', 'descripcion',
-      'DESCRIPTION', 'Description', 'description',
-      'NOMBRE', 'Nombre', 'nombre', 'Name', 'name',
-      'MATERIAL', 'Material', 'material' // A veces el material contiene la descripción
-    ];
-    
-    for (const field of possibleNameFields) {
-      if (item[field] && typeof item[field] === 'string' && item[field].trim()) {
-        return item[field].trim();
-      }
-    }
-    
-    return 'Sin descripción';
+    return item.Producto || 'Sin descripción';
   };
 
   const getUnit = (item: any) => {
-    const possibleUnitFields = [
-      'UMB', 'umb', 'Umb',
-      'UNIDAD', 'Unidad', 'unidad', 'Unit', 'unit',
-      'UM', 'um', 'Um'
-    ];
-    
-    for (const field of possibleUnitFields) {
-      if (item[field] && typeof item[field] === 'string' && item[field].trim()) {
-        return item[field].trim();
-      }
-    }
-    
-    return 'UN';
+    return item.UMB || 'UN';
   };
 
   const exportExcel = async () => {
@@ -192,29 +146,29 @@ const Index = () => {
 
       // FILAS DE DATOS - MAPPING EXACTO CON CÓDIGOS REALES
       excelData.forEach((item, index) => {
-        const materialCode = getMaterialCode(item, index);  // CÓDIGO NUMÉRICO REAL
-        const productName = getProductName(item);           // DESCRIPCIÓN COMPLETA
-        const unit = getUnit(item);                         // UNIDAD
-        const stock = Number(item.Stock) || 0;              // STOCK
+        const materialCode = getMaterialCode(item, index);
+        const productName = getProductName(item);
+        const unit = getUnit(item);
+        const stock = Number(item.Stock) || 0;
         
         console.log('📊 Exportando fila con código real:', {
-          materialCode,    // Columna MATERIAL
-          productName,     // Columna PRODUCTO  
-          unit,           // Columna UMB
-          stock           // Columna STOCK
+          materialCode,
+          productName,
+          unit,
+          stock
         });
         
         const dataRow = worksheet.addRow([
-          materialCode,     // MATERIAL = Código numérico REAL
-          productName,      // PRODUCTO = Descripción completa
-          unit,            // UMB = Unidad
-          stock            // STOCK = Cantidad
+          materialCode,
+          productName,
+          unit,
+          stock
         ]);
         
         dataRow.eachCell((cell, colNumber) => {
           cell.font = { name: 'Arial' };
           cell.alignment = { 
-            horizontal: colNumber === 2 ? 'left' : 'center', // PRODUCTO alineado a la izquierda
+            horizontal: colNumber === 2 ? 'left' : 'center',
             vertical: 'middle' 
           };
           cell.border = {
