@@ -32,7 +32,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         const worksheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[worksheetName];
         
-        console.log('=== PROCESANDO ARCHIVO CORREGIDO ===');
+        console.log('=== PROCESANDO ARCHIVO CON MAPEO CORREGIDO ===');
         
         // Convertir toda la hoja a JSON para ver la estructura real
         const allData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
@@ -40,6 +40,8 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         
         // Buscar la fila de encabezados que contenga "MATERIAL", "PRODUCTO", etc.
         let headerRowIndex = -1;
+        let columnMapping: any = {};
+        
         for (let i = 0; i < allData.length; i++) {
           const row = allData[i] as any[];
           if (row && row.some(cell => 
@@ -48,6 +50,24 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
           )) {
             headerRowIndex = i;
             console.log('Encabezados encontrados en fila:', i, row);
+            
+            // Mapear las columnas según los encabezados reales
+            row.forEach((header, colIndex) => {
+              if (typeof header === 'string') {
+                const headerUpper = header.toUpperCase().trim();
+                if (headerUpper.includes('MATERIAL')) {
+                  columnMapping.material = colIndex;
+                } else if (headerUpper.includes('PRODUCTO')) {
+                  columnMapping.producto = colIndex;
+                } else if (headerUpper.includes('UMB')) {
+                  columnMapping.umb = colIndex;
+                } else if (headerUpper.includes('STOCK')) {
+                  columnMapping.stock = colIndex;
+                }
+              }
+            });
+            
+            console.log('Mapeo de columnas detectado:', columnMapping);
             break;
           }
         }
@@ -56,32 +76,31 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
           throw new Error('No se encontraron los encabezados del inventario');
         }
 
-        // Procesar datos desde la fila siguiente a los encabezados
+        // Procesar datos usando el mapeo correcto
         const processedData = [];
-        console.log('Iniciando procesamiento de datos...');
+        console.log('Iniciando procesamiento con mapeo correcto...');
         
         for (let i = headerRowIndex + 1; i < allData.length; i++) {
           const row = allData[i] as any[];
           
           console.log(`Procesando fila ${i}:`, row);
           
-          // Verificar que la fila tenga datos válidos - CORREGIDO
-          // Cambio: verificar row[1] (Material) en lugar de row[0]
-          if (row && row.length > 1 && row[1]) {
-            const material = String(row[1] || '');  // Columna B: MATERIAL
-            const producto = String(row[2] || '');  // Columna C: PRODUCTO  
-            const umb = String(row[3] || 'UN');     // Columna D: UMB
-            const stock = Number(row[4]) || 0;      // Columna E: STOCK
+          // Verificar que la fila tenga datos válidos usando el mapeo
+          if (row && row.length > 0 && (row[columnMapping.material] || row[columnMapping.producto])) {
+            const material = String(row[columnMapping.material] || '');
+            const producto = String(row[columnMapping.producto] || '');
+            const umb = String(row[columnMapping.umb] || 'UN');
+            const stock = Number(row[columnMapping.stock]) || 0;
             
             const item = {
               Material: material,
               Producto: producto,
-              Codigo: material,  // Usar el material como código también
+              Codigo: material, // Usar el material como código también
               UMB: umb,
               Stock: stock
             };
             
-            console.log(`✅ Producto procesado:`, item);
+            console.log(`✅ Producto procesado correctamente:`, item);
             processedData.push(item);
           } else {
             console.log(`❌ Fila ${i} omitida - datos insuficientes:`, row);
@@ -89,7 +108,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         }
         
         console.log('✅ Procesamiento completado:', processedData.length, 'productos');
-        console.log('Muestra de productos:', processedData.slice(0, 3));
+        console.log('Muestra de productos procesados:', processedData.slice(0, 3));
         
         if (processedData.length === 0) {
           throw new Error('No se encontraron productos válidos en el archivo');
@@ -99,7 +118,7 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
         
         toast({
           title: "✅ Archivo procesado correctamente",
-          description: `Se cargaron ${processedData.length} productos desde ${file.name}`,
+          description: `Se cargaron ${processedData.length} productos con mapeo corregido`,
         });
         
       } catch (error) {
