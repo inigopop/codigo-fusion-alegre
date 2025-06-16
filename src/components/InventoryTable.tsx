@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,21 +28,23 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }));
   }, [data]);
 
-  // Función SIMPLE para obtener código - SOLO campos directos
+  // Función CORREGIDA para obtener código real del Excel
   const getMaterialCode = useCallback((product: any) => {
-    // Buscar SOLO en campos Material y Codigo directamente
-    if (product.Material && typeof product.Material === 'string') {
+    console.log('🔍 Producto completo recibido:', product);
+    
+    // Intentar obtener Material primero
+    if (product.Material) {
       console.log('✅ Material encontrado:', product.Material);
-      return product.Material;
+      return String(product.Material);
     }
     
-    if (product.Codigo && typeof product.Codigo === 'string') {
+    // Si no hay Material, intentar Codigo
+    if (product.Codigo) {
       console.log('✅ Código encontrado:', product.Codigo);
-      return product.Codigo;
+      return String(product.Codigo);
     }
     
-    // Si no hay ninguno, mostrar mensaje de error claro
-    console.error('❌ No se encontró Material ni Código para:', product);
+    console.error('❌ No se encontró Material ni Código válido para:', product);
     return 'SIN-CODIGO';
   }, []);
 

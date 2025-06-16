@@ -287,45 +287,70 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
-  const updateProductStock = (productQuery: string, newStock: number) => {
-    console.log('🔄 Intentando actualizar stock:', { productQuery, newStock });
+  const updateProductStock = useCallback((productQuery: string, newStock: number) => {
+    console.log('🔄 MÓVIL - Intentando actualizar stock:', { productQuery, newStock });
+    console.log('🔍 MÓVIL - Datos disponibles:', excelData.length, 'productos');
     
-    const productIndex = excelData.findIndex(item => {
+    // Buscar producto de manera más robusta
+    let productIndex = -1;
+    const query = productQuery.toLowerCase().trim();
+    
+    // Primera búsqueda: coincidencia exacta en nombre del producto
+    productIndex = excelData.findIndex(item => {
       const productName = (item.Producto || '').toLowerCase();
-      const material = (item.Material || '').toLowerCase();
-      const codigo = (item.Codigo || '').toLowerCase();
-      const query = productQuery.toLowerCase();
-      
-      return productName.includes(query) || 
-             material.includes(query) ||
-             codigo.includes(query) ||
-             query.split(' ').some(word => 
-               productName.includes(word) || material.includes(word) || codigo.includes(word)
-             );
+      return productName.includes(query);
     });
+    
+    // Segunda búsqueda: por código de material
+    if (productIndex === -1) {
+      productIndex = excelData.findIndex(item => {
+        const material = String(item.Material || '').toLowerCase();
+        const codigo = String(item.Codigo || '').toLowerCase();
+        return material.includes(query) || codigo.includes(query);
+      });
+    }
+    
+    // Tercera búsqueda: por palabras individuales
+    if (productIndex === -1) {
+      const queryWords = query.split(' ').filter(word => word.length > 2);
+      productIndex = excelData.findIndex(item => {
+        const productName = (item.Producto || '').toLowerCase();
+        const material = String(item.Material || '').toLowerCase();
+        const codigo = String(item.Codigo || '').toLowerCase();
+        
+        return queryWords.some(word => 
+          productName.includes(word) || 
+          material.includes(word) || 
+          codigo.includes(word)
+        );
+      });
+    }
+
+    console.log('🔍 MÓVIL - Resultado búsqueda:', { query, productIndex });
 
     if (productIndex !== -1) {
       const product = excelData[productIndex];
-      console.log('✅ Producto encontrado para actualizar:', product.Producto, 'en índice:', productIndex);
+      console.log('✅ MÓVIL - Producto encontrado:', product.Producto, 'en índice:', productIndex);
       
-      // LLAMAR A LA FUNCIÓN CORRECTA CON EL ÍNDICE
+      // LLAMAR A LA FUNCIÓN CON EL ÍNDICE CORRECTO
       onUpdateStock(productIndex, newStock);
       
-      speak(`Stock actualizado: ${product.Producto} ahora tiene ${newStock} ${product.UMB}`);
+      speak(`Stock actualizado: ${product.Producto} ahora tiene ${newStock} ${product.UMB || 'unidades'}`);
       
       toast({
         title: "✅ Stock actualizado",
-        description: `${product.Producto}: ${newStock} ${product.UMB}`,
+        description: `${product.Producto}: ${newStock} ${product.UMB || 'UN'}`,
       });
     } else {
-      speak(`No pude actualizar el stock de ${productQuery}`);
+      console.log('❌ MÓVIL - Producto no encontrado para:', productQuery);
+      speak(`No pude encontrar el producto ${productQuery}`);
       toast({
         title: "❌ No se pudo actualizar",
         description: `Producto no encontrado: ${productQuery}`,
         variant: "destructive",
       });
     }
-  };
+  }, [excelData, onUpdateStock, toast]);
 
   const speak = (text: string) => {
     if ('speechSynthesis' in window) {

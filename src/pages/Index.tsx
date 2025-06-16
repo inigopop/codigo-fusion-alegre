@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -44,20 +45,23 @@ const Index = () => {
     });
   };
 
-  // Función SIMPLE para obtener el código - IGUAL que en InventoryTable
+  // Función CORREGIDA para obtener el código - IGUAL que en InventoryTable
   const getMaterialCode = (item: any) => {
-    // Buscar SOLO en campos Material y Codigo directamente
-    if (item.Material && typeof item.Material === 'string') {
+    console.log('🔍 Exportación - Producto completo:', item);
+    
+    // Intentar obtener Material primero
+    if (item.Material) {
       console.log('✅ Exportación - Material:', item.Material);
-      return item.Material;
+      return String(item.Material);
     }
     
-    if (item.Codigo && typeof item.Codigo === 'string') {
+    // Si no hay Material, intentar Codigo
+    if (item.Codigo) {
       console.log('✅ Exportación - Código:', item.Codigo);
-      return item.Codigo;
+      return String(item.Codigo);
     }
     
-    console.error('❌ Exportación - No se encontró Material ni Código');
+    console.error('❌ Exportación - No se encontró Material ni Código válido');
     return 'SIN-CODIGO';
   };
 
