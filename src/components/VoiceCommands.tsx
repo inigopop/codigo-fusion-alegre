@@ -30,6 +30,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
+  // Función para normalizar texto (quitar acentos y convertir a minúsculas)
+  const normalizeText = useCallback((text: string): string => {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remover acentos
+      .replace(/[^\w\s]/g, ' ') // Reemplazar caracteres especiales con espacios
+      .replace(/\s+/g, ' ') // Múltiples espacios a uno solo
+      .trim();
+  }, []);
+
   // Función para síntesis de voz
   const speak = useCallback((text: string) => {
     console.log('🔊 Hablando:', text);
@@ -129,33 +140,60 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return variations;
   };
 
-  // Función para calcular similitud entre strings
+  // Función para calcular similitud entre strings (MEJORADA con normalización)
   const calculateSimilarity = (str1: string, str2: string): number => {
-    const s1 = str1.toLowerCase().trim();
-    const s2 = str2.toLowerCase().trim();
+    const s1 = normalizeText(str1);
+    const s2 = normalizeText(str2);
+    
+    console.log('🔍 Comparando:', str1, '→', s1, 'vs', str2, '→', s2);
     
     // Coincidencia exacta
     if (s1 === s2) return 100;
     
     // Contiene la búsqueda completa
-    if (s2.includes(s1) || s1.includes(s2)) return 80;
+    if (s2.includes(s1) || s1.includes(s2)) return 90;
     
-    // Coincidencia por palabras individuales
-    const words1 = s1.split(/\s+/);
-    const words2 = s2.split(/\s+/);
+    // Coincidencia por palabras individuales (mejorada)
+    const words1 = s1.split(/\s+/).filter(w => w.length > 2);
+    const words2 = s2.split(/\s+/).filter(w => w.length > 2);
     
     let matchingWords = 0;
+    let totalSimilarity = 0;
+    
     words1.forEach(word1 => {
-      if (word1.length > 2) {
-        words2.forEach(word2 => {
-          if (word2.includes(word1) || word1.includes(word2)) {
-            matchingWords++;
-          }
-        });
+      let bestMatch = 0;
+      words2.forEach(word2 => {
+        // Coincidencia exacta de palabra
+        if (word1 === word2) {
+          bestMatch = Math.max(bestMatch, 100);
+        }
+        // Una palabra contiene la otra
+        else if (word2.includes(word1) || word1.includes(word2)) {
+          bestMatch = Math.max(bestMatch, 80);
+        }
+        // Similitud por caracteres (para palabras cortas)
+        else if (word1.length >= 3 && word2.length >= 3) {
+          const commonChars = [...word1].filter(char => word2.includes(char)).length;
+          const similarity = (commonChars / Math.max(word1.length, word2.length)) * 60;
+          bestMatch = Math.max(bestMatch, similarity);
+        }
+      });
+      
+      if (bestMatch > 40) {
+        matchingWords++;
+        totalSimilarity += bestMatch;
       }
     });
     
-    return (matchingWords / Math.max(words1.length, words2.length)) * 60;
+    if (matchingWords === 0) return 0;
+    
+    const avgSimilarity = totalSimilarity / matchingWords;
+    const wordRatio = matchingWords / Math.max(words1.length, words2.length);
+    
+    const finalScore = avgSimilarity * wordRatio;
+    console.log('📊 Similitud calculada:', finalScore.toFixed(1), '%');
+    
+    return finalScore;
   };
 
   // Función para buscar sugerencias de productos
@@ -185,17 +223,21 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return suggestions;
   };
 
-  // Función para buscar producto exacto
+  // Función para buscar producto exacto (MEJORADA)
   const findExactProductMatch = (query: string): number => {
-    const normalizedQuery = query.toLowerCase().trim();
+    console.log('🎯 Buscando coincidencia exacta para:', query);
     
     return excelData.findIndex(product => {
-      const productName = (product.Producto || '').toLowerCase();
-      const materialCode = (product.Material || product.Codigo || '').toLowerCase();
+      const productName = (product.Producto || '').toString();
+      const materialCode = (product.Material || product.Codigo || '').toString();
       
-      // Coincidencia muy alta
-      return calculateSimilarity(normalizedQuery, productName) > 70 ||
-             calculateSimilarity(normalizedQuery, materialCode) > 70;
+      const nameSimilarity = calculateSimilarity(query, productName);
+      const codeSimilarity = calculateSimilarity(query, materialCode);
+      
+      console.log('🔍 Producto:', productName, '| Similitud nombre:', nameSimilarity.toFixed(1), '| Similitud código:', codeSimilarity.toFixed(1));
+      
+      // Lowered threshold for exact match to be more permissive
+      return nameSimilarity > 60 || codeSimilarity > 60;
     });
   };
 
@@ -290,7 +332,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           
           if (exactMatch !== -1) {
             // Encontrado exacto - añadir cantidad
-            console.log('✅ Producto encontrado exacto, añadiendo stock');
+            console.log('✅ Producto encontrado exacto en índice:', exactMatch);
             addStockToProduct(exactMatch, quantity);
             commandProcessed = true;
           } else {
