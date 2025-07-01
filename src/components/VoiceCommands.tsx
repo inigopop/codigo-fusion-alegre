@@ -30,6 +30,18 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
+  // Función para síntesis de voz
+  const speak = useCallback((text: string) => {
+    console.log('🔊 Hablando:', text);
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-ES';
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      speechSynthesis.speak(utterance);
+    }
+  }, []);
+
   // Procesar vocabulario del Excel para mejorar reconocimiento
   const processVocabulary = useCallback(() => {
     if (excelData.length === 0) return [];
@@ -212,11 +224,11 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     
     console.log('🔍 Procesando comando:', command);
     
-    const lowerCommand = command.toLowerCase();
+    const lowerCommand = command.toLowerCase().trim();
     
-    // Patrones para actualización de stock - MEJORADOS
+    // Patrones mejorados para detectar comandos
     const updatePatterns = [
-      /(.+?)\s+(\d+(?:\.\d+)?)/i,  // "vino emina 12"
+      /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,  // "vino emina 12"
       /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,  // "añadir vino emina 12"
       /(?:actualizar?|cambiar?|poner?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)/i,
     ];
@@ -237,10 +249,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           
           if (exactMatch !== -1) {
             // Encontrado exacto - añadir cantidad
+            console.log('✅ Producto encontrado exacto, añadiendo stock');
             addStockToProduct(exactMatch, quantity);
             commandProcessed = true;
           } else {
             // No encontrado exacto - mostrar sugerencias
+            console.log('❓ Producto no encontrado exacto, mostrando sugerencias');
             showProductSuggestions(productQuery, quantity);
             commandProcessed = true;
           }
@@ -250,14 +264,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
     
     if (!commandProcessed) {
-      const product = excelData[0];
-      if (product) {
-        speak(`No entendí el comando. Intenta decir: "${product.Producto}" seguido de la cantidad`);
-      }
+      console.log('❌ Comando no procesado');
+      speak(`No entendí el comando. Intenta decir el nombre del producto seguido de la cantidad`);
+      toast({
+        title: "❌ Comando no reconocido",
+        description: "Intenta decir: 'nombre del producto cantidad'",
+        variant: "destructive",
+      });
     }
     
     setTimeout(() => setIsProcessing(false), 1000);
-  }, [excelData]);
+  }, [excelData, onUpdateStock, speak]);
 
   // Función para forzar la detención del reconocimiento
   const forceStopRecognition = useCallback(() => {
@@ -390,7 +407,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     };
 
     return recognition;
-  }, [excelData, isListening, isProcessing]);
+  }, [excelData, isListening, isProcessing, processVoiceCommand, handleRecognitionError]);
 
   // Función para iniciar la escucha
   const startListening = () => {
