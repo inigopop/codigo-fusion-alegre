@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -74,7 +73,7 @@ const Index = () => {
   };
 
   const exportExcel = async () => {
-    console.log('=== EXPORTACIÓN CORREGIDA - COLUMNAS EXACTAS ===');
+    console.log('=== EXPORTACIÓN CORREGIDA - NOMBRE DINÁMICO ===');
     
     if (excelData.length === 0) {
       toast({
@@ -90,7 +89,8 @@ const Index = () => {
       const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
                      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
       const mesActual = meses[new Date().getMonth()];
-      const tituloCompleto = `INVENTARIO BARES ${mesActual} ${new Date().getFullYear()}`;
+      const añoActual = new Date().getFullYear();
+      const tituloCompleto = `INVENTARIO BARES ${mesActual} ${añoActual}`;
 
       // Crear workbook y worksheet
       const workbook = new ExcelJS.Workbook();
@@ -202,13 +202,13 @@ const Index = () => {
         worksheet.getRow(i).height = 20;
       }
 
-      // Generar archivo
+      // Generar archivo con nombre dinámico
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { 
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
       });
       
-      const exportFileName = `${fileName.replace(/\.[^/.]+$/, "") || "inventario"}_actualizado.xlsx`;
+      const exportFileName = `Inventario Bares ${mesActual} ${añoActual}.xlsx`;
       
       // Descargar archivo
       const url = window.URL.createObjectURL(blob);
@@ -220,11 +220,11 @@ const Index = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      console.log('✅ Archivo generado con códigos reales del Excel');
+      console.log('✅ Archivo generado con nombre dinámico:', exportFileName);
 
       toast({
         title: "✅ Archivo exportado correctamente",
-        description: `${exportFileName} con códigos reales y ${excelData.length} productos`,
+        description: `${exportFileName} con ${excelData.length} productos`,
       });
 
     } catch (error) {
@@ -276,15 +276,28 @@ const Index = () => {
 
         <Tabs defaultValue="excel" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="excel" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="excel" 
+              className={`flex items-center gap-2 ${
+                excelData.length === 0 
+                  ? 'data-[state=active]:bg-green-500 data-[state=active]:text-white bg-green-100 text-green-700 hover:bg-green-200' 
+                  : 'data-[state=active]:bg-red-500 data-[state=active]:text-white bg-red-100 text-red-700 hover:bg-red-200'
+              }`}
+            >
               <FileSpreadsheet className="w-4 h-4" />
               Cargar Archivo
             </TabsTrigger>
-            <TabsTrigger value="inventory" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="inventory" 
+              className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white bg-blue-100 text-blue-700 hover:bg-blue-200"
+            >
               <ClipboardList className="w-4 h-4" />
               Inventario ({excelData.length})
             </TabsTrigger>
-            <TabsTrigger value="voice" className="flex items-center gap-2">
+            <TabsTrigger 
+              value="voice" 
+              className="flex items-center gap-2 data-[state=active]:bg-yellow-500 data-[state=active]:text-black bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+            >
               <Mic className="w-4 h-4" />
               Control por Voz
             </TabsTrigger>

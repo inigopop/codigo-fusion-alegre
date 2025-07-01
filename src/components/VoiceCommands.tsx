@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -288,16 +289,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   };
 
   const updateProductStock = useCallback((productQuery: string, newStock: number) => {
-    console.log('🔄 MÓVIL - Intentando actualizar stock:', { productQuery, newStock });
-    console.log('🔍 MÓVIL - Datos disponibles:', excelData.length, 'productos');
+    console.log('🔄 MÓVIL CORREGIDO - Intentando actualizar stock:', { productQuery, newStock });
+    console.log('🔍 MÓVIL CORREGIDO - Datos disponibles:', excelData.length, 'productos');
     
-    // Buscar producto de manera más robusta
+    // Buscar producto de manera más robusta - CORREGIDO
     let productIndex = -1;
     const query = productQuery.toLowerCase().trim();
     
     // Primera búsqueda: coincidencia exacta en nombre del producto
     productIndex = excelData.findIndex(item => {
       const productName = (item.Producto || '').toLowerCase();
+      console.log('🔍 Comparando con producto:', productName, 'vs query:', query);
       return productName.includes(query);
     });
     
@@ -306,31 +308,34 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       productIndex = excelData.findIndex(item => {
         const material = String(item.Material || '').toLowerCase();
         const codigo = String(item.Codigo || '').toLowerCase();
+        console.log('🔍 Comparando códigos:', { material, codigo }, 'vs query:', query);
         return material.includes(query) || codigo.includes(query);
       });
     }
     
-    // Tercera búsqueda: por palabras individuales
+    // Tercera búsqueda: por palabras individuales en el nombre del producto
     if (productIndex === -1) {
       const queryWords = query.split(' ').filter(word => word.length > 2);
+      console.log('🔍 Buscando por palabras:', queryWords);
+      
       productIndex = excelData.findIndex(item => {
         const productName = (item.Producto || '').toLowerCase();
-        const material = String(item.Material || '').toLowerCase();
-        const codigo = String(item.Codigo || '').toLowerCase();
+        console.log('🔍 Producto actual:', productName);
         
-        return queryWords.some(word => 
-          productName.includes(word) || 
-          material.includes(word) || 
-          codigo.includes(word)
-        );
+        // Buscar si alguna palabra de la query está en el nombre del producto
+        return queryWords.some(word => {
+          const found = productName.includes(word);
+          console.log(`🔍 Palabra "${word}" encontrada en "${productName}":`, found);
+          return found;
+        });
       });
     }
 
-    console.log('🔍 MÓVIL - Resultado búsqueda:', { query, productIndex });
+    console.log('🔍 MÓVIL CORREGIDO - Resultado búsqueda final:', { query, productIndex });
 
     if (productIndex !== -1) {
       const product = excelData[productIndex];
-      console.log('✅ MÓVIL - Producto encontrado:', product.Producto, 'en índice:', productIndex);
+      console.log('✅ MÓVIL CORREGIDO - Producto encontrado:', product.Producto, 'en índice:', productIndex);
       
       // LLAMAR A LA FUNCIÓN CON EL ÍNDICE CORRECTO
       onUpdateStock(productIndex, newStock);
@@ -338,11 +343,15 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       speak(`Stock actualizado: ${product.Producto} ahora tiene ${newStock} ${product.UMB || 'unidades'}`);
       
       toast({
-        title: "✅ Stock actualizado",
+        title: "✅ Stock actualizado correctamente",
         description: `${product.Producto}: ${newStock} ${product.UMB || 'UN'}`,
       });
     } else {
-      console.log('❌ MÓVIL - Producto no encontrado para:', productQuery);
+      console.log('❌ MÓVIL CORREGIDO - Producto no encontrado para:', productQuery);
+      
+      // Mostrar productos similares para debug
+      console.log('📋 Productos disponibles:', excelData.slice(0, 5).map(p => p.Producto));
+      
       speak(`No pude encontrar el producto ${productQuery}`);
       toast({
         title: "❌ No se pudo actualizar",
@@ -404,7 +413,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             onClick={startListening}
             disabled={isListening}
             size="lg"
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
           >
             <Mic className="w-5 h-5" />
             Iniciar Escucha
@@ -424,7 +433,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
         {/* Estado visual */}
         {isListening && (
-          <div className="flex items-center gap-2 text-green-600 animate-pulse">
+          <div className="flex items-center gap-2 text-yellow-600 animate-pulse">
             <Volume2 className="w-5 h-5" />
             <span className="font-medium">Escuchando...</span>
           </div>
