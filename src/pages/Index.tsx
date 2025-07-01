@@ -30,13 +30,17 @@ const Index = () => {
     }
   };
 
-  const handleUpdateStock = (index: number, newStock: number) => {
-    console.log('🔄 Actualizando stock por ÍNDICE:', index, 'nuevo valor:', newStock);
+  const handleUpdateStock = (index: number, quantityToAdd: number) => {
+    console.log('🔄 SUMANDO stock por ÍNDICE:', index, 'cantidad a sumar:', quantityToAdd);
     
     setExcelData(prevData => {
       return prevData.map((item, itemIndex) => {
         if (itemIndex === index) {
-          console.log('✅ Stock actualizado en índice:', index, 'de', item.Stock, 'a', newStock);
+          const currentStock = Number(item.Stock) || 0;
+          const newStock = currentStock + quantityToAdd;
+          
+          console.log('✅ Stock actualizado en índice:', index, 'de', currentStock, '+', quantityToAdd, '=', newStock);
+          
           return { ...item, Stock: newStock };
         }
         return item;
@@ -44,7 +48,6 @@ const Index = () => {
     });
   };
 
-  // Función CORREGIDA para obtener el código - IGUAL que en InventoryTable
   const getMaterialCode = (item: any) => {
     console.log('🔍 Exportación - Producto completo:', item);
     

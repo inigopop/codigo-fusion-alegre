@@ -1,21 +1,32 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Mic, MicOff, Volume2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Mic, MicOff, Volume2, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
   excelData: any[];
-  onUpdateStock: (index: number, newStock: number) => void;
+  onUpdateStock: (index: number, stockToAdd: number) => void;
   isListening: boolean;
   setIsListening: (listening: boolean) => void;
+}
+
+interface ProductSuggestion {
+  product: any;
+  index: number;
+  similarity: number;
 }
 
 const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }: VoiceCommandsProps) => {
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastCommand, setLastCommand] = useState('');
+  const [showSuggestionsDialog, setShowSuggestionsDialog] = useState(false);
+  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
+  const [pendingQuantity, setPendingQuantity] = useState<number>(0);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -69,6 +80,243 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return variations;
   };
 
+  // Función para calcular similitud entre strings
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const s1 = str1.toLowerCase().trim();
+    const s2 = str2.toLowerCase().trim();
+    
+    // Coincidencia exacta
+    if (s1 === s2) return 100;
+    
+    // Contiene la búsqueda completa
+    if (s2.includes(s1) || s1.includes(s2)) return 80;
+    
+    // Coincidencia por palabras individuales
+    const words1 = s1.split(/\s+/);
+    const words2 = s2.split(/\s+/);
+    
+    let matchingWords = 0;
+    words1.forEach(word1 => {
+      if (word1.length > 2) {
+        words2.forEach(word2 => {
+          if (word2.includes(word1) || word1.includes(word2)) {
+            matchingWords++;
+          }
+        });
+      }
+    });
+    
+    return (matchingWords / Math.max(words1.length, words2.length)) * 60;
+  };
+
+  // Función para buscar sugerencias de productos
+  const findProductSuggestions = (query: string): ProductSuggestion[] => {
+    console.log('🔍 Buscando sugerencias para:', query);
+    
+    const suggestions = excelData
+      .map((product, index) => {
+        const productName = (product.Producto || '').toString();
+        const materialCode = (product.Material || product.Codigo || '').toString();
+        
+        const nameSimilarity = calculateSimilarity(query, productName);
+        const codeSimilarity = calculateSimilarity(query, materialCode);
+        const maxSimilarity = Math.max(nameSimilarity, codeSimilarity);
+        
+        return {
+          product,
+          index,
+          similarity: maxSimilarity
+        };
+      })
+      .filter(item => item.similarity > 30)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5);
+    
+    console.log('📋 Sugerencias encontradas:', suggestions.length);
+    return suggestions;
+  };
+
+  // Función para buscar producto exacto
+  const findExactProductMatch = (query: string): number => {
+    const normalizedQuery = query.toLowerCase().trim();
+    
+    return excelData.findIndex(product => {
+      const productName = (product.Producto || '').toLowerCase();
+      const materialCode = (product.Material || product.Codigo || '').toLowerCase();
+      
+      // Coincidencia muy alta
+      return calculateSimilarity(normalizedQuery, productName) > 70 ||
+             calculateSimilarity(normalizedQuery, materialCode) > 70;
+    });
+  };
+
+  // Función para mostrar sugerencias de productos
+  const showProductSuggestions = (query: string, quantity: number) => {
+    console.log('🎭 Mostrando sugerencias para:', query, 'cantidad:', quantity);
+    
+    const productSuggestions = findProductSuggestions(query);
+    
+    if (productSuggestions.length > 0) {
+      setSuggestions(productSuggestions);
+      setPendingQuantity(quantity);
+      setSearchQuery(query);
+      setShowSuggestionsDialog(true);
+      
+      speak(`No encontré exactamente "${query}". Te muestro las opciones más parecidas.`);
+    } else {
+      speak(`No encontré productos parecidos a "${query}"`);
+      toast({
+        title: "❌ Producto no encontrado",
+        description: `No se encontraron coincidencias para: ${query}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Función para añadir stock a un producto
+  const addStockToProduct = (productIndex: number, quantityToAdd: number) => {
+    const product = excelData[productIndex];
+    console.log('➕ SUMANDO stock:', {
+      producto: product.Producto,
+      stockActual: product.Stock,
+      cantidadASumar: quantityToAdd,
+      nuevoStock: (Number(product.Stock) || 0) + quantityToAdd
+    });
+    
+    // Llamar a la función con la cantidad a SUMAR (no reemplazar)
+    onUpdateStock(productIndex, quantityToAdd);
+    
+    const newTotal = (Number(product.Stock) || 0) + quantityToAdd;
+    
+    speak(`Añadido ${quantityToAdd} a ${product.Producto}. Total: ${newTotal} ${product.UMB || 'unidades'}`);
+    
+    toast({
+      title: "✅ Stock actualizado",
+      description: `${product.Producto}: +${quantityToAdd} = ${newTotal} ${product.UMB || 'UN'}`,
+    });
+  };
+
+  // Función para manejar la selección de una sugerencia
+  const handleSuggestionSelect = (suggestion: ProductSuggestion) => {
+    addStockToProduct(suggestion.index, pendingQuantity);
+    setShowSuggestionsDialog(false);
+    setSuggestions([]);
+    setPendingQuantity(0);
+    setSearchQuery('');
+  };
+
+  // Función para procesar el comando de voz
+  const processVoiceCommand = useCallback((command: string) => {
+    setIsProcessing(true);
+    setLastCommand(command);
+    
+    console.log('🔍 Procesando comando:', command);
+    
+    const lowerCommand = command.toLowerCase();
+    
+    // Patrones para actualización de stock - MEJORADOS
+    const updatePatterns = [
+      /(.+?)\s+(\d+(?:\.\d+)?)/i,  // "vino emina 12"
+      /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,  // "añadir vino emina 12"
+      /(?:actualizar?|cambiar?|poner?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)/i,
+    ];
+    
+    let commandProcessed = false;
+    
+    for (const pattern of updatePatterns) {
+      const match = lowerCommand.match(pattern);
+      if (match) {
+        const productQuery = match[1].trim();
+        const quantity = parseFloat(match[2]);
+        
+        console.log('🎯 Comando de actualización detectado:', { productQuery, quantity });
+        
+        if (!isNaN(quantity) && quantity >= 0) {
+          // Buscar producto exacto primero
+          const exactMatch = findExactProductMatch(productQuery);
+          
+          if (exactMatch !== -1) {
+            // Encontrado exacto - añadir cantidad
+            addStockToProduct(exactMatch, quantity);
+            commandProcessed = true;
+          } else {
+            // No encontrado exacto - mostrar sugerencias
+            showProductSuggestions(productQuery, quantity);
+            commandProcessed = true;
+          }
+          break;
+        }
+      }
+    }
+    
+    if (!commandProcessed) {
+      const product = excelData[0];
+      if (product) {
+        speak(`No entendí el comando. Intenta decir: "${product.Producto}" seguido de la cantidad`);
+      }
+    }
+    
+    setTimeout(() => setIsProcessing(false), 1000);
+  }, [excelData]);
+
+  // Función para forzar la detención del reconocimiento
+  const forceStopRecognition = useCallback(() => {
+    console.log('🛑 Forzando detención completa');
+    
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        recognitionRef.current.abort();
+      } catch (error) {
+        console.log('Error deteniendo reconocimiento:', error);
+      }
+      recognitionRef.current = null;
+    }
+    
+    setIsListening(false);
+    setIsProcessing(false);
+    setTranscript('');
+    setLastCommand('');
+    
+    toast({
+      title: "🛑 Reconocimiento detenido",
+      description: "Puedes volver a empezar cuando quieras",
+    });
+  }, []);
+
+  // Función para manejar el error de reconocimiento
+  const handleRecognitionError = (error: string) => {
+    setIsProcessing(false);
+    
+    switch (error) {
+      case 'no-speech':
+        setTranscript('No se detectó voz. Intenta de nuevo.');
+        break;
+      case 'audio-capture':
+        toast({
+          title: "Error de micrófono",
+          description: "No se puede acceder al micrófono",
+          variant: "destructive",
+        });
+        forceStopRecognition();
+        break;
+      case 'not-allowed':
+        toast({
+          title: "Permisos denegados",
+          description: "Permite el acceso al micrófono",
+          variant: "destructive",
+        });
+        forceStopRecognition();
+        break;
+      case 'network':
+        setTranscript('Error de conexión. Reintentando...');
+        break;
+      default:
+        setTranscript(`Error: ${error}. Presiona iniciar para continuar.`);
+    }
+  };
+
+  // Función para configurar el reconocimiento
   const setupRecognition = useCallback(() => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       toast({
@@ -144,232 +392,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return recognition;
   }, [excelData, isListening, isProcessing]);
 
-  const handleRecognitionError = (error: string) => {
-    setIsProcessing(false);
-    
-    switch (error) {
-      case 'no-speech':
-        setTranscript('No se detectó voz. Intenta de nuevo.');
-        break;
-      case 'audio-capture':
-        toast({
-          title: "Error de micrófono",
-          description: "No se puede acceder al micrófono",
-          variant: "destructive",
-        });
-        forceStopRecognition();
-        break;
-      case 'not-allowed':
-        toast({
-          title: "Permisos denegados",
-          description: "Permite el acceso al micrófono",
-          variant: "destructive",
-        });
-        forceStopRecognition();
-        break;
-      case 'network':
-        setTranscript('Error de conexión. Reintentando...');
-        break;
-      default:
-        setTranscript(`Error: ${error}. Presiona iniciar para continuar.`);
-    }
-  };
-
-  const forceStopRecognition = useCallback(() => {
-    console.log('🛑 Forzando detención completa');
-    
-    // Detener reconocimiento actual
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-        recognitionRef.current.abort();
-      } catch (error) {
-        console.log('Error deteniendo reconocimiento:', error);
-      }
-      recognitionRef.current = null;
-    }
-    
-    // Resetear todos los estados
-    setIsListening(false);
-    setIsProcessing(false);
-    setTranscript('');
-    setLastCommand('');
-    
-    toast({
-      title: "🛑 Reconocimiento detenido",
-      description: "Puedes volver a empezar cuando quieras",
-    });
-  }, []);
-
-  const processVoiceCommand = useCallback((command: string) => {
-    setIsProcessing(true);
-    setLastCommand(command);
-    
-    console.log('🔍 Procesando comando:', command);
-    
-    const lowerCommand = command.toLowerCase();
-    
-    // Patrones para actualización de stock - CORREGIDOS
-    const updatePatterns = [
-      /(.+?)\s+(\d+(?:\.\d+)?)/i,  // "cerveza 50" o "patatas 25.5"
-      /(?:actualizar?|cambiar?|poner?|establecer?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)/i,
-      /(.+?)\s+(?:cantidad|stock|inventario)\s+(\d+(?:\.\d+)?)/i
-    ];
-    
-    let productFound = false;
-    
-    for (const pattern of updatePatterns) {
-      const match = lowerCommand.match(pattern);
-      if (match) {
-        const productQuery = match[1].trim();
-        const quantity = parseFloat(match[2]);
-        
-        console.log('🎯 Comando de actualización detectado:', { productQuery, quantity });
-        
-        if (!isNaN(quantity) && quantity >= 0) {
-          updateProductStock(productQuery, quantity);
-          productFound = true;
-          break;
-        }
-      }
-    }
-    
-    // Si no se encontró un comando de actualización, buscar producto
-    if (!productFound) {
-      const searchPatterns = [
-        /(?:buscar?|encuentra?|localiza?|mostrar?)\s+(.+)/i,
-        /(.+)\s+(?:stock|cantidad|inventario)/i,
-        /^(.+)$/i // Cualquier texto como búsqueda
-      ];
-      
-      for (const pattern of searchPatterns) {
-        const match = lowerCommand.match(pattern);
-        if (match) {
-          const productQuery = match[1].trim();
-          searchProduct(productQuery);
-          break;
-        }
-      }
-    }
-    
-    setTimeout(() => setIsProcessing(false), 1000);
-  }, []);
-
-  const searchProduct = (query: string) => {
-    const results = excelData.filter(item => {
-      const productName = (item.Producto || '').toLowerCase();
-      const material = (item.Material || '').toLowerCase();
-      const codigo = (item.Codigo || '').toLowerCase();
-      const searchQuery = query.toLowerCase();
-      
-      return productName.includes(searchQuery) || 
-             material.includes(searchQuery) ||
-             codigo.includes(searchQuery) ||
-             searchQuery.split(' ').some(word => 
-               productName.includes(word) || material.includes(word) || codigo.includes(word)
-             );
-    });
-
-    if (results.length > 0) {
-      const product = results[0];
-      speak(`Encontré ${product.Producto}, stock actual: ${product.Stock} ${product.UMB}`);
-      
-      toast({
-        title: `✅ Producto encontrado`,
-        description: `${product.Producto} - Stock: ${product.Stock} ${product.UMB}`,
-      });
-    } else {
-      speak(`No encontré el producto ${query}`);
-      toast({
-        title: "❌ Producto no encontrado",
-        description: `No se encontró: ${query}`,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const updateProductStock = useCallback((productQuery: string, newStock: number) => {
-    console.log('🔄 MÓVIL CORREGIDO - Intentando actualizar stock:', { productQuery, newStock });
-    console.log('🔍 MÓVIL CORREGIDO - Datos disponibles:', excelData.length, 'productos');
-    
-    // Buscar producto de manera más robusta - CORREGIDO
-    let productIndex = -1;
-    const query = productQuery.toLowerCase().trim();
-    
-    // Primera búsqueda: coincidencia exacta en nombre del producto
-    productIndex = excelData.findIndex(item => {
-      const productName = (item.Producto || '').toLowerCase();
-      console.log('🔍 Comparando con producto:', productName, 'vs query:', query);
-      return productName.includes(query);
-    });
-    
-    // Segunda búsqueda: por código de material
-    if (productIndex === -1) {
-      productIndex = excelData.findIndex(item => {
-        const material = String(item.Material || '').toLowerCase();
-        const codigo = String(item.Codigo || '').toLowerCase();
-        console.log('🔍 Comparando códigos:', { material, codigo }, 'vs query:', query);
-        return material.includes(query) || codigo.includes(query);
-      });
-    }
-    
-    // Tercera búsqueda: por palabras individuales en el nombre del producto
-    if (productIndex === -1) {
-      const queryWords = query.split(' ').filter(word => word.length > 2);
-      console.log('🔍 Buscando por palabras:', queryWords);
-      
-      productIndex = excelData.findIndex(item => {
-        const productName = (item.Producto || '').toLowerCase();
-        console.log('🔍 Producto actual:', productName);
-        
-        // Buscar si alguna palabra de la query está en el nombre del producto
-        return queryWords.some(word => {
-          const found = productName.includes(word);
-          console.log(`🔍 Palabra "${word}" encontrada en "${productName}":`, found);
-          return found;
-        });
-      });
-    }
-
-    console.log('🔍 MÓVIL CORREGIDO - Resultado búsqueda final:', { query, productIndex });
-
-    if (productIndex !== -1) {
-      const product = excelData[productIndex];
-      console.log('✅ MÓVIL CORREGIDO - Producto encontrado:', product.Producto, 'en índice:', productIndex);
-      
-      // LLAMAR A LA FUNCIÓN CON EL ÍNDICE CORRECTO
-      onUpdateStock(productIndex, newStock);
-      
-      speak(`Stock actualizado: ${product.Producto} ahora tiene ${newStock} ${product.UMB || 'unidades'}`);
-      
-      toast({
-        title: "✅ Stock actualizado correctamente",
-        description: `${product.Producto}: ${newStock} ${product.UMB || 'UN'}`,
-      });
-    } else {
-      console.log('❌ MÓVIL CORREGIDO - Producto no encontrado para:', productQuery);
-      
-      // Mostrar productos similares para debug
-      console.log('📋 Productos disponibles:', excelData.slice(0, 5).map(p => p.Producto));
-      
-      speak(`No pude encontrar el producto ${productQuery}`);
-      toast({
-        title: "❌ No se pudo actualizar",
-        description: `Producto no encontrado: ${productQuery}`,
-        variant: "destructive",
-      });
-    }
-  }, [excelData, onUpdateStock, toast]);
-
-  const speak = (text: string) => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'es-ES';
-      utterance.rate = 0.8;
-      speechSynthesis.speak(utterance);
-    }
-  };
-
+  // Función para iniciar la escucha
   const startListening = () => {
     if (excelData.length === 0) {
       toast({
@@ -392,10 +415,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
+  // Función para detener la escucha
   const stopListening = () => {
     forceStopRecognition();
   };
 
+  // Efecto para limpiar el reconocimiento al desmontar el componente
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -457,25 +482,74 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </CardContent>
       </Card>
 
+      {/* Diálogo de sugerencias */}
+      <Dialog open={showSuggestionsDialog} onOpenChange={setShowSuggestionsDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Productos similares a "{searchQuery}"</DialogTitle>
+            <DialogDescription>
+              Selecciona el producto correcto para añadir {pendingQuantity} unidades
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {suggestions.map((suggestion, index) => (
+              <div
+                key={index}
+                className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                onClick={() => handleSuggestionSelect(suggestion)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-lg">{suggestion.product.Producto}</p>
+                    <p className="text-sm text-gray-600">
+                      Código: {suggestion.product.Material || suggestion.product.Codigo} | 
+                      Stock actual: {suggestion.product.Stock || 0} {suggestion.product.UMB}
+                    </p>
+                    <p className="text-xs text-green-600">
+                      Similitud: {Math.round(suggestion.similarity)}%
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-green-600">
+                    <Plus className="w-5 h-5" />
+                    <span className="font-bold text-lg">{pendingQuantity}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSuggestionsDialog(false)}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Ayuda de comandos */}
       <Card>
         <CardContent className="p-4">
           <h3 className="font-medium mb-3">💡 Comandos disponibles:</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div>
-              <strong>🔍 Buscar productos:</strong>
+              <strong>➕ Añadir stock (SUMATORIO):</strong>
               <ul className="ml-4 mt-1 space-y-1 text-gray-600">
-                <li>• "Buscar cerveza"</li>
-                <li>• "Mostrar patatas"</li>
-                <li>• Solo di el nombre del producto</li>
+                <li>• "Vino Emina 12" (suma 12)</li>
+                <li>• "Cerveza 6" (suma 6)</li>
+                <li>• "Añadir patatas 25"</li>
               </ul>
             </div>
             <div>
-              <strong>📊 Actualizar stock:</strong>
+              <strong>🔍 Si no encuentra exacto:</strong>
               <ul className="ml-4 mt-1 space-y-1 text-gray-600">
-                <li>• "Cerveza 50"</li>
-                <li>• "Actualizar patatas a 25"</li>
-                <li>• "Poner aceite en 12"</li>
+                <li>• Se abrirá un diálogo</li>
+                <li>• Mostrará productos similares</li>
+                <li>• Selecciona el correcto</li>
               </ul>
             </div>
           </div>
@@ -485,11 +559,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       {/* Información del sistema */}
       <Card className="border-blue-200 bg-blue-50">
         <CardContent className="p-4">
-          <h3 className="font-medium text-blue-700 mb-2">📊 Estado del vocabulario:</h3>
-          <div className="text-sm text-blue-600">
+          <h3 className="font-medium text-blue-700 mb-2">📊 Sistema de Stock Sumatorio:</h3>
+          <div className="text-sm text-blue-600 space-y-1">
             <p>✅ Productos cargados: {excelData.length}</p>
-            <p>📚 Palabras reconocibles: {processVocabulary().length}</p>
+            <p>➕ Modo: SUMA cantidades al stock existente</p>
             <p>🎤 Reconocimiento: {isListening ? 'Activo' : 'Inactivo'}</p>
+            <p>🔍 Búsqueda inteligente con sugerencias automáticas</p>
           </div>
         </CardContent>
       </Card>

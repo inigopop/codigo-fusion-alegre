@@ -1,10 +1,9 @@
-
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Edit, Save, X, Search } from "lucide-react";
+import { Edit, Save, X, Search, Plus } from "lucide-react";
 
 interface InventoryTableProps {
   data: any[];
@@ -15,6 +14,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isAddMode, setIsAddMode] = useState<boolean>(false); // NUEVO: modo suma
   const inputRef = useRef<HTMLInputElement>(null);
   
   console.log('📊 Total productos cargados:', data.length);
@@ -83,10 +83,11 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
     }
   }, []);
 
-  const startEdit = useCallback((productId: string, currentStock: number) => {
-    console.log('🔧 Iniciando edición:', productId, currentStock);
+  const startEdit = useCallback((productId: string, currentStock: number, addMode: boolean = false) => {
+    console.log('🔧 Iniciando edición:', productId, currentStock, 'modo suma:', addMode);
     setEditingProductId(productId);
-    setEditValue(currentStock.toString());
+    setIsAddMode(addMode);
+    setEditValue(addMode ? '' : currentStock.toString());
     setTimeout(() => focusInput(), 50);
   }, [focusInput]);
 
@@ -96,13 +97,25 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
       if (product) {
         const numericValue = parseFloat(editValue);
         if (!isNaN(numericValue) && numericValue >= 0) {
-          onUpdateStock(product.originalIndex, numericValue);
+          if (isAddMode) {
+            // Modo suma: añadir cantidad al stock existente
+            onUpdateStock(product.originalIndex, numericValue);
+            console.log('➕ Sumando', numericValue, 'al stock de', product.Producto);
+          } else {
+            // Modo reemplazo: establecer nuevo stock total
+            const currentStock = Number(product.Stock) || 0;
+            const difference = numericValue - currentStock;
+            onUpdateStock(product.originalIndex, difference);
+            console.log('🔄 Reemplazando stock de', product.Producto, 'diferencia:', difference);
+          }
+          
           setEditingProductId(null);
           setEditValue('');
+          setIsAddMode(false);
         }
       }
     }
-  }, [editingProductId, editValue, onUpdateStock, filteredProducts]);
+  }, [editingProductId, editValue, onUpdateStock, filteredProducts, isAddMode]);
 
   const cancelEdit = useCallback(() => {
     setEditingProductId(null);
@@ -171,7 +184,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                 <TableHead className="min-w-[200px]">PRODUCTO</TableHead>
                 <TableHead className="w-20 min-w-[60px]">UMB</TableHead>
                 <TableHead className="w-32 min-w-[100px]">STOCK</TableHead>
-                <TableHead className="w-24 min-w-[100px]">Acciones</TableHead>
+                <TableHead className="w-32 min-w-[120px]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -198,21 +211,29 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                     </TableCell>
                     <TableCell>
                       {isEditing ? (
-                        <Input
-                          ref={inputRef}
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          value={editValue}
-                          onChange={handleInputChange}
-                          onKeyDown={handleKeyDown}
-                          className="w-24 text-center text-lg font-mono"
-                          inputMode="decimal"
-                          autoComplete="off"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          spellCheck={false}
-                        />
+                        <div className="space-y-2">
+                          <Input
+                            ref={inputRef}
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={editValue}
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder={isAddMode ? "Cantidad a sumar" : "Stock total"}
+                            className="w-32 text-center text-lg font-mono"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                          />
+                          {isAddMode && (
+                            <p className="text-xs text-green-600 text-center">
+                              +{editValue || '0'} = {displayStock + (parseFloat(editValue) || 0)}
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <span className="font-mono text-lg">
                           {displayStock.toFixed(1)}
@@ -240,14 +261,26 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          onClick={() => startEdit(product.uniqueId, displayStock)}
-                          className="min-h-[48px] min-w-[48px] hover:bg-blue-50"
-                        >
-                          <Edit className="w-5 h-5" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => startEdit(product.uniqueId, displayStock, false)}
+                            className="min-h-[48px] min-w-[48px] hover:bg-blue-50"
+                            title="Reemplazar stock"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => startEdit(product.uniqueId, displayStock, true)}
+                            className="min-h-[48px] min-w-[48px] hover:bg-green-50 text-green-600"
+                            title="Sumar al stock"
+                          >
+                            <Plus className="w-5 h-5" />
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -262,6 +295,13 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
             No se encontraron productos que coincidan con "{searchTerm}"
           </div>
         )}
+        
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <p className="text-sm text-blue-700">
+            <strong>💡 Tip:</strong> Usa el botón <Edit className="w-4 h-4 inline mx-1" /> para reemplazar el stock total, 
+            o el botón <Plus className="w-4 h-4 inline mx-1" /> para sumar cantidad al stock existente.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
