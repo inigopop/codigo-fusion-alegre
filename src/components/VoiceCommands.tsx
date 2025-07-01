@@ -42,6 +42,43 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   }, []);
 
+  // Función para convertir números en palabras a números
+  const wordsToNumber = useCallback((text: string): string => {
+    const numberWords: { [key: string]: string } = {
+      'cero': '0', 'uno': '1', 'dos': '2', 'tres': '3', 'cuatro': '4', 'cinco': '5',
+      'seis': '6', 'siete': '7', 'ocho': '8', 'nueve': '9', 'diez': '10',
+      'once': '11', 'doce': '12', 'trece': '13', 'catorce': '14', 'quince': '15',
+      'dieciséis': '16', 'diecisiete': '17', 'dieciocho': '18', 'diecinueve': '19',
+      'veinte': '20', 'veintiuno': '21', 'veintidós': '22', 'veintitrés': '23',
+      'veinticuatro': '24', 'veinticinco': '25', 'veintiséis': '26', 'veintisiete': '27',
+      'veintiocho': '28', 'veintinueve': '29', 'treinta': '30', 'cuarenta': '40',
+      'cincuenta': '50', 'sesenta': '60', 'setenta': '70', 'ochenta': '80', 'noventa': '90',
+      'cien': '100', 'doscientos': '200', 'trescientos': '300', 'cuatrocientos': '400',
+      'quinientos': '500'
+    };
+
+    let result = text.toLowerCase();
+    
+    // Manejar casos especiales como "treinta y cuatro"
+    result = result.replace(/treinta y cuatro/g, '34');
+    result = result.replace(/treinta y cinco/g, '35');
+    result = result.replace(/treinta y seis/g, '36');
+    result = result.replace(/treinta y siete/g, '37');
+    result = result.replace(/treinta y ocho/g, '38');
+    result = result.replace(/treinta y nueve/g, '39');
+    result = result.replace(/cuarenta y cinco/g, '45');
+    result = result.replace(/cincuenta y cinco/g, '55');
+    
+    // Reemplazar números individuales
+    Object.entries(numberWords).forEach(([word, number]) => {
+      const regex = new RegExp(`\\b${word}\\b`, 'gi');
+      result = result.replace(regex, number);
+    });
+    
+    console.log('🔢 Conversión números:', text, '->', result);
+    return result;
+  }, []);
+
   // Procesar vocabulario del Excel para mejorar reconocimiento
   const processVocabulary = useCallback(() => {
     if (excelData.length === 0) return [];
@@ -224,7 +261,11 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     
     console.log('🔍 Procesando comando:', command);
     
-    const lowerCommand = command.toLowerCase().trim();
+    // Convertir números en palabras a números primero
+    const commandWithNumbers = wordsToNumber(command);
+    console.log('🔄 Comando con números convertidos:', commandWithNumbers);
+    
+    const lowerCommand = commandWithNumbers.toLowerCase().trim();
     
     // Patrones mejorados para detectar comandos
     const updatePatterns = [
@@ -274,7 +315,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
     
     setTimeout(() => setIsProcessing(false), 1000);
-  }, [excelData, onUpdateStock, speak]);
+  }, [excelData, onUpdateStock, speak, wordsToNumber]);
 
   // Función para forzar la detención del reconocimiento
   const forceStopRecognition = useCallback(() => {
@@ -556,9 +597,10 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             <div>
               <strong>➕ Añadir stock (SUMATORIO):</strong>
               <ul className="ml-4 mt-1 space-y-1 text-gray-600">
-                <li>• "Vino Emina 12" (suma 12)</li>
-                <li>• "Cerveza 6" (suma 6)</li>
-                <li>• "Añadir patatas 25"</li>
+                <li>• "Vino Emina doce" (suma 12)</li>
+                <li>• "Cerveza seis" (suma 6)</li>
+                <li>• "Azúcar treinta y cuatro"</li>
+                <li>• "Añadir patatas veinticinco"</li>
               </ul>
             </div>
             <div>
@@ -581,6 +623,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             <p>✅ Productos cargados: {excelData.length}</p>
             <p>➕ Modo: SUMA cantidades al stock existente</p>
             <p>🎤 Reconocimiento: {isListening ? 'Activo' : 'Inactivo'}</p>
+            <p>🔢 Reconoce números en palabras (doce, treinta y cuatro, etc.)</p>
             <p>🔍 Búsqueda inteligente con sugerencias automáticas</p>
           </div>
         </CardContent>
