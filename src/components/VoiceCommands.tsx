@@ -61,24 +61,90 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
     let result = text.toLowerCase();
     
-    // CORREGIR: Manejar casos compuestos PRIMERO
-    result = result.replace(/treinta y uno/g, '31');
-    result = result.replace(/treinta y dos/g, '32');
-    result = result.replace(/treinta y tres/g, '33');
-    result = result.replace(/treinta y cuatro/g, '34');
-    result = result.replace(/treinta y cinco/g, '35');
-    result = result.replace(/treinta y seis/g, '36');
-    result = result.replace(/treinta y siete/g, '37');
-    result = result.replace(/treinta y ocho/g, '38');
-    result = result.replace(/treinta y nueve/g, '39');
-    result = result.replace(/cuarenta y uno/g, '41');
-    result = result.replace(/cuarenta y dos/g, '42');
-    result = result.replace(/cuarenta y tres/g, '43');
-    result = result.replace(/cuarenta y cuatro/g, '44');
-    result = result.replace(/cuarenta y cinco/g, '45');
-    result = result.replace(/cincuenta y cinco/g, '55');
+    // CORREGIR: Manejar casos compuestos COMPLETOS primero con expresiones regulares más específicas
+    result = result.replace(/\bnoventa y uno\b/g, '91');
+    result = result.replace(/\bnoventa y dos\b/g, '92');
+    result = result.replace(/\bnoventa y tres\b/g, '93');
+    result = result.replace(/\bnoventa y cuatro\b/g, '94');
+    result = result.replace(/\bnoventa y cinco\b/g, '95');
+    result = result.replace(/\bnoventa y seis\b/g, '96');
+    result = result.replace(/\bnoventa y siete\b/g, '97');
+    result = result.replace(/\bnoventa y ocho\b/g, '98');
+    result = result.replace(/\bnoventa y nueve\b/g, '99');
     
-    // Luego reemplazar números individuales
+    result = result.replace(/\bochenta y uno\b/g, '81');
+    result = result.replace(/\bochenta y dos\b/g, '82');
+    result = result.replace(/\bochenta y tres\b/g, '83');
+    result = result.replace(/\bochenta y cuatro\b/g, '84');
+    result = result.replace(/\bochenta y cinco\b/g, '85');
+    result = result.replace(/\bochenta y seis\b/g, '86');
+    result = result.replace(/\bochenta y siete\b/g, '87');
+    result = result.replace(/\bochenta y ocho\b/g, '88');
+    result = result.replace(/\bochenta y nueve\b/g, '89');
+    
+    result = result.replace(/\bsetenta y uno\b/g, '71');
+    result = result.replace(/\bsetenta y dos\b/g, '72');
+    result = result.replace(/\bsetenta y tres\b/g, '73');
+    result = result.replace(/\bsetenta y cuatro\b/g, '74');
+    result = result.replace(/\bsetenta y cinco\b/g, '75');
+    result = result.replace(/\bsetenta y seis\b/g, '76');
+    result = result.replace(/\bsetenta y siete\b/g, '77');
+    result = result.replace(/\bsetenta y ocho\b/g, '78');
+    result = result.replace(/\bsetenta y nueve\b/g, '79');
+    
+    result = result.replace(/\bsesenta y uno\b/g, '61');
+    result = result.replace(/\bsesenta y dos\b/g, '62');
+    result = result.replace(/\bsesenta y tres\b/g, '63');
+    result = result.replace(/\bsesenta y cuatro\b/g, '64');
+    result = result.replace(/\bsesenta y cinco\b/g, '65');
+    result = result.replace(/\bsesenta y seis\b/g, '66');
+    result = result.replace(/\bsesenta y siete\b/g, '67');
+    result = result.replace(/\bsesenta y ocho\b/g, '68');
+    result = result.replace(/\bsesenta y nueve\b/g, '69');
+    
+    result = result.replace(/\bcincuenta y uno\b/g, '51');
+    result = result.replace(/\bcincuenta y dos\b/g, '52');
+    result = result.replace(/\bcincuenta y tres\b/g, '53');
+    result = result.replace(/\bcincuenta y cuatro\b/g, '54');
+    result = result.replace(/\bcincuenta y cinco\b/g, '55');
+    result = result.replace(/\bcincuenta y seis\b/g, '56');
+    result = result.replace(/\bcincuenta y siete\b/g, '57');
+    result = result.replace(/\bcincuenta y ocho\b/g, '58');
+    result = result.replace(/\bcincuenta y nueve\b/g, '59');
+    
+    result = result.replace(/\bcuarenta y uno\b/g, '41');
+    result = result.replace(/\bcuarenta y dos\b/g, '42');
+    result = result.replace(/\bcuarenta y tres\b/g, '43');
+    result = result.replace(/\bcuarenta y cuatro\b/g, '44');
+    result = result.replace(/\bcuarenta y cinco\b/g, '45');
+    result = result.replace(/\bcuarenta y seis\b/g, '46');
+    result = result.replace(/\bcuarenta y siete\b/g, '47');
+    result = result.replace(/\bcuarenta y ocho\b/g, '48');
+    result = result.replace(/\bcuarenta y nueve\b/g, '49');
+    
+    result = result.replace(/\btreinta y uno\b/g, '31');
+    result = result.replace(/\btreinta y dos\b/g, '32');
+    result = result.replace(/\btreinta y tres\b/g, '33');
+    result = result.replace(/\btreinta y cuatro\b/g, '34');
+    result = result.replace(/\btreinta y cinco\b/g, '35');
+    result = result.replace(/\btreinta y seis\b/g, '36');
+    result = result.replace(/\btreinta y siete\b/g, '37');
+    result = result.replace(/\btreinta y ocho\b/g, '38');
+    result = result.replace(/\btreinta y nueve\b/g, '39');
+    
+    // Casos especiales para números de más de 100
+    result = result.replace(/\bciento uno\b/g, '101');
+    result = result.replace(/\bciento dos\b/g, '102');
+    result = result.replace(/\bciento tres\b/g, '103');
+    result = result.replace(/\bciento cuatro\b/g, '104');
+    result = result.replace(/\bciento cinco\b/g, '105');
+    result = result.replace(/\bciento cuarenta y uno\b/g, '141');
+    result = result.replace(/\bciento cuarenta y dos\b/g, '142');
+    result = result.replace(/\bciento cuarenta y tres\b/g, '143');
+    result = result.replace(/\bciento cuarenta y cuatro\b/g, '144');
+    result = result.replace(/\bciento cuarenta y cinco\b/g, '145');
+    
+    // Luego reemplazar números individuales usando \b para límites de palabra
     Object.entries(numberWords).forEach(([word, number]) => {
       const regex = new RegExp(`\\b${word}\\b`, 'gi');
       result = result.replace(regex, number);

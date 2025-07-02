@@ -299,9 +299,20 @@ const Index = () => {
                   ? 'data-[state=active]:bg-green-500 data-[state=active]:text-white bg-green-100 text-green-700 hover:bg-green-200' 
                   : 'data-[state=active]:bg-red-500 data-[state=active]:text-white bg-red-100 text-red-700 hover:bg-red-200'
               }`}
+              onClick={() => {
+                // Si no hay datos, activar automáticamente el input de archivo
+                if (excelData.length === 0) {
+                  setTimeout(() => {
+                    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                    if (fileInput) {
+                      fileInput.click();
+                    }
+                  }, 100);
+                }
+              }}
             >
               <FileSpreadsheet className="w-4 h-4" />
-              Cargar Archivo
+              {excelData.length === 0 ? 'Cargar Archivo' : 'Archivo Cargado ✓'}
             </TabsTrigger>
             <TabsTrigger 
               value="inventory" 
