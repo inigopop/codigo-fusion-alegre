@@ -214,43 +214,24 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         };
       })
       .filter(item => item.similarity > 30)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 5);
+      .sort((a, b) => b.similarity - a.similarity);
     
     console.log('📋 Sugerencias encontradas:', suggestions.length);
     return suggestions;
   };
 
-  // Función para buscar producto exacto (MEJORADA)
-  const findExactProductMatch = (query: string): number => {
-    console.log('🎯 Buscando coincidencia exacta para:', query);
-    
-    return excelData.findIndex(product => {
-      const productName = (product.Producto || '').toString();
-      const materialCode = (product.Material || product.Codigo || '').toString();
-      
-      const nameSimilarity = calculateSimilarity(query, productName);
-      const codeSimilarity = calculateSimilarity(query, materialCode);
-      
-      console.log('🔍 Producto:', productName, '| Similitud nombre:', nameSimilarity.toFixed(1), '| Similitud código:', codeSimilarity.toFixed(1));
-      
-      // Lowered threshold for exact match to be more permissive
-      return nameSimilarity > 60 || codeSimilarity > 60;
-    });
-  };
-
-  // Función para mostrar sugerencias de productos
+  // Función CORREGIDA para buscar siempre sugerencias cuando hay múltiples coincidencias
   const showProductSuggestions = (query: string, quantity: number) => {
     console.log('🎭 Mostrando sugerencias para:', query, 'cantidad:', quantity);
     
     const productSuggestions = findProductSuggestions(query);
     
     if (productSuggestions.length > 0) {
-      setSuggestions(productSuggestions);
+      setSuggestions(productSuggestions.slice(0, 5)); // Limitar a 5 sugerencias
       setPendingQuantity(quantity);
       setSearchQuery(query);
       setShowSuggestionsDialog(true);
-      console.log('✅ Diálogo de sugerencias abierto');
+      console.log('✅ Diálogo de sugerencias abierto con', productSuggestions.length, 'opciones');
     } else {
       console.log('❌ No se encontraron sugerencias');
       toast({
@@ -275,6 +256,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     onUpdateStock(productIndex, quantityToAdd);
     
     console.log(`✅ Stock actualizado: ${product.Producto} +${quantityToAdd}`);
+    
+    // Toast de confirmación
+    toast({
+      title: "✅ Stock actualizado",
+      description: `${product.Producto}: +${quantityToAdd} unidades`,
+    });
   };
 
   // Función para manejar la selección de una sugerencia
@@ -287,7 +274,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setSearchQuery('');
   };
 
-  // Función CORREGIDA para procesar el comando de voz
+  // Función CORREGIDA para procesar el comando de voz - SIEMPRE mostrar sugerencias
   const processVoiceCommand = useCallback((command: string) => {
     setIsProcessing(true);
     setLastCommand(command);
@@ -318,20 +305,10 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         console.log('🎯 Comando de actualización detectado:', { productQuery, quantity });
         
         if (!isNaN(quantity) && quantity >= 0) {
-          // Buscar producto exacto primero
-          const exactMatch = findExactProductMatch(productQuery);
-          
-          if (exactMatch !== -1) {
-            // Encontrado exacto - añadir cantidad
-            console.log('✅ Producto encontrado exacto en índice:', exactMatch);
-            addStockToProduct(exactMatch, quantity);
-            commandProcessed = true;
-          } else {
-            // No encontrado exacto - mostrar sugerencias
-            console.log('❓ Producto no encontrado exacto, mostrando sugerencias');
-            showProductSuggestions(productQuery, quantity);
-            commandProcessed = true;
-          }
+          // CAMBIO IMPORTANTE: Siempre mostrar sugerencias, nunca selección automática
+          console.log('🔍 Mostrando sugerencias para que el usuario pueda elegir');
+          showProductSuggestions(productQuery, quantity);
+          commandProcessed = true;
           break;
         }
       }
@@ -572,13 +549,14 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </CardContent>
       </Card>
 
-      {/* Diálogo de sugerencias */}
+      {/* Diálogo de sugerencias MEJORADO */}
       <Dialog open={showSuggestionsDialog} onOpenChange={setShowSuggestionsDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Productos similares a "{searchQuery}"</DialogTitle>
+            <DialogTitle>🔍 Selecciona el producto correcto</DialogTitle>
             <DialogDescription>
-              Selecciona el producto correcto para añadir {pendingQuantity} unidades
+              Encontramos {suggestions.length} productos similares a "{searchQuery}". 
+              Selecciona el correcto para añadir {pendingQuantity} unidades.
             </DialogDescription>
           </DialogHeader>
           
@@ -586,7 +564,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             {suggestions.map((suggestion, index) => (
               <div
                 key={index}
-                className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors hover:border-green-400"
                 onClick={() => handleSuggestionSelect(suggestion)}
               >
                 <div className="flex items-center justify-between">
@@ -601,7 +579,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                     </p>
                   </div>
                   
-                  <div className="flex items-center gap-2 text-green-600">
+                  <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded">
                     <Plus className="w-5 h-5" />
                     <span className="font-bold text-lg">{pendingQuantity}</span>
                   </div>
