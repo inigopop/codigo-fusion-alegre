@@ -41,18 +41,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       .trim();
   }, []);
 
-  // Función para síntesis de voz
-  const speak = useCallback((text: string) => {
-    console.log('🔊 Hablando:', text);
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'es-ES';
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      speechSynthesis.speak(utterance);
-    }
-  }, []);
-
   // Función para convertir números en palabras a números
   const wordsToNumber = useCallback((text: string): string => {
     const numberWords: { [key: string]: string } = {
@@ -241,7 +229,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     });
   };
 
-  // Función para mostrar sugerencias de productos
+  // Función para mostrar sugerencias de productos (sin notificación de voz)
   const showProductSuggestions = (query: string, quantity: number) => {
     console.log('🎭 Mostrando sugerencias para:', query, 'cantidad:', quantity);
     
@@ -252,10 +240,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       setPendingQuantity(quantity);
       setSearchQuery(query);
       setShowSuggestionsDialog(true);
-      
-      speak(`No encontré exactamente "${query}". Te muestro las opciones más parecidas.`);
     } else {
-      speak(`No encontré productos parecidos a "${query}"`);
       toast({
         title: "❌ Producto no encontrado",
         description: `No se encontraron coincidencias para: ${query}`,
@@ -264,7 +249,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
-  // Función para añadir stock a un producto
+  // Función para añadir stock a un producto (sin notificaciones)
   const addStockToProduct = (productIndex: number, quantityToAdd: number) => {
     const product = excelData[productIndex];
     console.log('➕ SUMANDO stock:', {
@@ -277,14 +262,8 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     // Llamar a la función con la cantidad a SUMAR (no reemplazar)
     onUpdateStock(productIndex, quantityToAdd);
     
-    const newTotal = (Number(product.Stock) || 0) + quantityToAdd;
-    
-    speak(`Añadido ${quantityToAdd} a ${product.Producto}. Total: ${newTotal} ${product.UMB || 'unidades'}`);
-    
-    toast({
-      title: "✅ Stock actualizado",
-      description: `${product.Producto}: +${quantityToAdd} = ${newTotal} ${product.UMB || 'UN'}`,
-    });
+    // Solo log, sin notificaciones
+    console.log(`✅ Stock actualizado: ${product.Producto} +${quantityToAdd}`);
   };
 
   // Función para manejar la selección de una sugerencia
@@ -348,7 +327,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     
     if (!commandProcessed) {
       console.log('❌ Comando no procesado');
-      speak(`No entendí el comando. Intenta decir el nombre del producto seguido de la cantidad`);
       toast({
         title: "❌ Comando no reconocido",
         description: "Intenta decir: 'nombre del producto cantidad'",
@@ -357,7 +335,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
     
     setTimeout(() => setIsProcessing(false), 1000);
-  }, [excelData, onUpdateStock, speak, wordsToNumber]);
+  }, [excelData, onUpdateStock, wordsToNumber]);
 
   // Función para forzar la detención del reconocimiento
   const forceStopRecognition = useCallback(() => {

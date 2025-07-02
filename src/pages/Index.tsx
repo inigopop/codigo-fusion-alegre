@@ -15,6 +15,7 @@ const Index = () => {
   const [originalStyles, setOriginalStyles] = useState<any>({});
   const [fileName, setFileName] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
+  const [highlightedCells, setHighlightedCells] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
   const handleDataProcessed = (data: any[], header: any, styles: any, filename?: string) => {
@@ -46,6 +47,18 @@ const Index = () => {
         return item;
       });
     });
+
+    // Resaltar la celda actualizada
+    setHighlightedCells(prev => new Set(prev).add(index));
+    
+    // Quitar el resaltado después de 3 segundos
+    setTimeout(() => {
+      setHighlightedCells(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(index);
+        return newSet;
+      });
+    }, 3000);
   };
 
   const getMaterialCode = (item: any) => {
@@ -329,6 +342,7 @@ const Index = () => {
             <InventoryTable 
               data={excelData}
               onUpdateStock={handleUpdateStock}
+              highlightedCells={highlightedCells}
             />
           </TabsContent>
 

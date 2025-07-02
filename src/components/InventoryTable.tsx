@@ -8,13 +8,14 @@ import { Edit, Save, X, Search, Plus } from "lucide-react";
 interface InventoryTableProps {
   data: any[];
   onUpdateStock: (index: number, newStock: number) => void;
+  highlightedCells?: Set<number>;
 }
 
-const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
+const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: InventoryTableProps) => {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [isAddMode, setIsAddMode] = useState<boolean>(false); // NUEVO: modo suma
+  const [isAddMode, setIsAddMode] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   
   console.log('📊 Total productos cargados:', data.length);
@@ -191,13 +192,17 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
               {filteredProducts.map((product) => {
                 const isEditing = editingProductId === product.uniqueId;
                 const displayStock = Number(product.Stock || 0);
+                const isHighlighted = highlightedCells.has(product.originalIndex);
                 
                 const materialCode = getMaterialCode(product);
                 const productName = getProductName(product);
                 const unit = getUnit(product);
                 
                 return (
-                  <TableRow key={product.uniqueId}>
+                  <TableRow 
+                    key={product.uniqueId}
+                    className={isHighlighted ? 'bg-green-100 border-green-300 animate-pulse' : ''}
+                  >
                     <TableCell className="font-mono text-sm font-bold break-all">
                       {materialCode}
                     </TableCell>
@@ -209,7 +214,7 @@ const InventoryTable = ({ data, onUpdateStock }: InventoryTableProps) => {
                     <TableCell className="text-center font-semibold">
                       {unit}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={isHighlighted ? 'bg-green-200 font-bold text-green-800' : ''}>
                       {isEditing ? (
                         <div className="space-y-2">
                           <Input
