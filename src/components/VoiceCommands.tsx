@@ -41,34 +41,44 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       .trim();
   }, []);
 
-  // Función para convertir números en palabras a números
+  // Función CORREGIDA para convertir números en palabras a números
   const wordsToNumber = useCallback((text: string): string => {
+    console.log('🔢 Entrada original:', text);
+    
     const numberWords: { [key: string]: string } = {
       'cero': '0', 'uno': '1', 'dos': '2', 'tres': '3', 'cuatro': '4', 'cinco': '5',
       'seis': '6', 'siete': '7', 'ocho': '8', 'nueve': '9', 'diez': '10',
       'once': '11', 'doce': '12', 'trece': '13', 'catorce': '14', 'quince': '15',
-      'dieciséis': '16', 'diecisiete': '17', 'dieciocho': '18', 'diecinueve': '19',
-      'veinte': '20', 'veintiuno': '21', 'veintidós': '22', 'veintitrés': '23',
-      'veinticuatro': '24', 'veinticinco': '25', 'veintiséis': '26', 'veintisiete': '27',
-      'veintiocho': '28', 'veintinueve': '29', 'treinta': '30', 'cuarenta': '40',
-      'cincuenta': '50', 'sesenta': '60', 'setenta': '70', 'ochenta': '80', 'noventa': '90',
+      'dieciséis': '16', 'dieciseis': '16', 'diecisiete': '17', 'dieciocho': '18', 'diecinueve': '19',
+      'veinte': '20', 'veintiuno': '21', 'veintidós': '22', 'veintidos': '22',
+      'veintitrés': '23', 'veintitres': '23', 'veinticuatro': '24', 'veinticinco': '25',
+      'veintiséis': '26', 'veintiseis': '26', 'veintisiete': '27', 'veintiocho': '28',
+      'veintinueve': '29', 'treinta': '30', 'cuarenta': '40', 'cincuenta': '50',
+      'sesenta': '60', 'setenta': '70', 'ochenta': '80', 'noventa': '90',
       'cien': '100', 'doscientos': '200', 'trescientos': '300', 'cuatrocientos': '400',
       'quinientos': '500'
     };
 
     let result = text.toLowerCase();
     
-    // Manejar casos especiales como "treinta y cuatro"
+    // CORREGIR: Manejar casos compuestos PRIMERO
+    result = result.replace(/treinta y uno/g, '31');
+    result = result.replace(/treinta y dos/g, '32');
+    result = result.replace(/treinta y tres/g, '33');
     result = result.replace(/treinta y cuatro/g, '34');
     result = result.replace(/treinta y cinco/g, '35');
     result = result.replace(/treinta y seis/g, '36');
     result = result.replace(/treinta y siete/g, '37');
     result = result.replace(/treinta y ocho/g, '38');
     result = result.replace(/treinta y nueve/g, '39');
+    result = result.replace(/cuarenta y uno/g, '41');
+    result = result.replace(/cuarenta y dos/g, '42');
+    result = result.replace(/cuarenta y tres/g, '43');
+    result = result.replace(/cuarenta y cuatro/g, '44');
     result = result.replace(/cuarenta y cinco/g, '45');
     result = result.replace(/cincuenta y cinco/g, '55');
     
-    // Reemplazar números individuales
+    // Luego reemplazar números individuales
     Object.entries(numberWords).forEach(([word, number]) => {
       const regex = new RegExp(`\\b${word}\\b`, 'gi');
       result = result.replace(regex, number);
@@ -229,7 +239,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     });
   };
 
-  // Función para mostrar sugerencias de productos (sin notificación de voz)
+  // Función para mostrar sugerencias de productos
   const showProductSuggestions = (query: string, quantity: number) => {
     console.log('🎭 Mostrando sugerencias para:', query, 'cantidad:', quantity);
     
@@ -240,7 +250,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       setPendingQuantity(quantity);
       setSearchQuery(query);
       setShowSuggestionsDialog(true);
+      console.log('✅ Diálogo de sugerencias abierto');
     } else {
+      console.log('❌ No se encontraron sugerencias');
       toast({
         title: "❌ Producto no encontrado",
         description: `No se encontraron coincidencias para: ${query}`,
@@ -249,7 +261,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
-  // Función para añadir stock a un producto (sin notificaciones)
+  // Función para añadir stock a un producto
   const addStockToProduct = (productIndex: number, quantityToAdd: number) => {
     const product = excelData[productIndex];
     console.log('➕ SUMANDO stock:', {
@@ -262,12 +274,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     // Llamar a la función con la cantidad a SUMAR (no reemplazar)
     onUpdateStock(productIndex, quantityToAdd);
     
-    // Solo log, sin notificaciones
     console.log(`✅ Stock actualizado: ${product.Producto} +${quantityToAdd}`);
   };
 
   // Función para manejar la selección de una sugerencia
   const handleSuggestionSelect = (suggestion: ProductSuggestion) => {
+    console.log('🎯 Seleccionando sugerencia:', suggestion.product.Producto);
     addStockToProduct(suggestion.index, pendingQuantity);
     setShowSuggestionsDialog(false);
     setSuggestions([]);
@@ -275,7 +287,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setSearchQuery('');
   };
 
-  // Función para procesar el comando de voz
+  // Función CORREGIDA para procesar el comando de voz
   const processVoiceCommand = useCallback((command: string) => {
     setIsProcessing(true);
     setLastCommand(command);
@@ -290,8 +302,8 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     
     // Patrones mejorados para detectar comandos
     const updatePatterns = [
-      /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,  // "vino emina 12"
-      /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,  // "añadir vino emina 12"
+      /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,  // "vino emina 33"
+      /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,  // "añadir vino emina 33"
       /(?:actualizar?|cambiar?|poner?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)/i,
     ];
     
@@ -335,7 +347,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
     
     setTimeout(() => setIsProcessing(false), 1000);
-  }, [excelData, onUpdateStock, wordsToNumber]);
+  }, [excelData, onUpdateStock, wordsToNumber, toast]);
 
   // Función para forzar la detención del reconocimiento
   const forceStopRecognition = useCallback(() => {
