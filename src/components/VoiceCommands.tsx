@@ -312,6 +312,27 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return suggestions;
   };
 
+  // FUNCIÓN ARREGLADA: showProductSuggestions
+  const showProductSuggestions = (productQuery: string, quantity: number) => {
+    console.log('🔍 Mostrando sugerencias para:', productQuery, 'cantidad:', quantity);
+    
+    const suggestions = findProductSuggestions(productQuery);
+    
+    if (suggestions.length === 0) {
+      toast({
+        title: "❌ Producto no encontrado",
+        description: `No se encontró "${productQuery}"`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSuggestions(suggestions.slice(0, 5));
+    setPendingQuantity(quantity);
+    setSearchQuery(productQuery);
+    setShowSuggestionsDialog(true);
+  };
+
   // NUEVA función para parsear comandos múltiples
   const parseMultipleCommands = (command: string): { productQuery: string; quantity: number }[] => {
     console.log('🔄 Parseando comando múltiple:', command);
