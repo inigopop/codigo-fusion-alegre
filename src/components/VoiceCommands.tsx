@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Mic, MicOff, Volume2, Plus } from "lucide-react";
+import { Mic, MicOff, Volume2, Plus, List } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
@@ -19,6 +19,12 @@ interface ProductSuggestion {
   similarity: number;
 }
 
+interface MultipleProductUpdate {
+  productQuery: string;
+  quantity: number;
+  suggestions: ProductSuggestion[];
+}
+
 const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }: VoiceCommandsProps) => {
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -27,6 +33,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
   const [pendingQuantity, setPendingQuantity] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // Estados para comandos múltiples
+  const [showMultipleDialog, setShowMultipleDialog] = useState(false);
+  const [pendingUpdates, setPendingUpdates] = useState<MultipleProductUpdate[]>([]);
+  const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
+  
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -61,90 +73,104 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
     let result = text.toLowerCase();
     
-    // CORREGIR: Manejar casos compuestos COMPLETOS primero con expresiones regulares más específicas
-    result = result.replace(/\bnoventa y uno\b/g, '91');
-    result = result.replace(/\bnoventa y dos\b/g, '92');
-    result = result.replace(/\bnoventa y tres\b/g, '93');
-    result = result.replace(/\bnoventa y cuatro\b/g, '94');
-    result = result.replace(/\bnoventa y cinco\b/g, '95');
-    result = result.replace(/\bnoventa y seis\b/g, '96');
-    result = result.replace(/\bnoventa y siete\b/g, '97');
-    result = result.replace(/\bnoventa y ocho\b/g, '98');
-    result = result.replace(/\bnoventa y nueve\b/g, '99');
+    // Manejar números compuestos COMPLETOS primero
+    const compoundPatterns = [
+      // 90-99
+      { pattern: /\bnoventa y nueve\b/g, value: '99' },
+      { pattern: /\bnoventa y ocho\b/g, value: '98' },
+      { pattern: /\bnoventa y siete\b/g, value: '97' },
+      { pattern: /\bnoventa y seis\b/g, value: '96' },
+      { pattern: /\bnoventa y cinco\b/g, value: '95' },
+      { pattern: /\bnoventa y cuatro\b/g, value: '94' },
+      { pattern: /\bnoventa y tres\b/g, value: '93' },
+      { pattern: /\bnoventa y dos\b/g, value: '92' },
+      { pattern: /\bnoventa y uno\b/g, value: '91' },
+      
+      // 80-89
+      { pattern: /\bochenta y nueve\b/g, value: '89' },
+      { pattern: /\bochenta y ocho\b/g, value: '88' },
+      { pattern: /\bochenta y siete\b/g, value: '87' },
+      { pattern: /\bochenta y seis\b/g, value: '86' },
+      { pattern: /\bochenta y cinco\b/g, value: '85' },
+      { pattern: /\bochenta y cuatro\b/g, value: '84' },
+      { pattern: /\bochenta y tres\b/g, value: '83' },
+      { pattern: /\bochenta y dos\b/g, value: '82' },
+      { pattern: /\bochenta y uno\b/g, value: '81' },
+      
+      // 70-79
+      { pattern: /\bsetenta y nueve\b/g, value: '79' },
+      { pattern: /\bsetenta y ocho\b/g, value: '78' },
+      { pattern: /\bsetenta y siete\b/g, value: '77' },
+      { pattern: /\bsetenta y seis\b/g, value: '76' },
+      { pattern: /\bsetenta y cinco\b/g, value: '75' },
+      { pattern: /\bsetenta y cuatro\b/g, value: '74' },
+      { pattern: /\bsetenta y tres\b/g, value: '73' },
+      { pattern: /\bsetenta y dos\b/g, value: '72' },
+      { pattern: /\bsetenta y uno\b/g, value: '71' },
+      
+      // 60-69
+      { pattern: /\bsesenta y nueve\b/g, value: '69' },
+      { pattern: /\bsesenta y ocho\b/g, value: '68' },
+      { pattern: /\bsesenta y siete\b/g, value: '67' },
+      { pattern: /\bsesenta y seis\b/g, value: '66' },
+      { pattern: /\bsesenta y cinco\b/g, value: '65' },
+      { pattern: /\bsesenta y cuatro\b/g, value: '64' },
+      { pattern: /\bsesenta y tres\b/g, value: '63' },
+      { pattern: /\bsesenta y dos\b/g, value: '62' },
+      { pattern: /\bsesenta y uno\b/g, value: '61' },
+      
+      // 50-59
+      { pattern: /\bcincuenta y nueve\b/g, value: '59' },
+      { pattern: /\bcincuenta y ocho\b/g, value: '58' },
+      { pattern: /\bcincuenta y siete\b/g, value: '57' },
+      { pattern: /\bcincuenta y seis\b/g, value: '56' },
+      { pattern: /\bcincuenta y cinco\b/g, value: '55' },
+      { pattern: /\bcincuenta y cuatro\b/g, value: '54' },
+      { pattern: /\bcincuenta y tres\b/g, value: '53' },
+      { pattern: /\bcincuenta y dos\b/g, value: '52' },
+      { pattern: /\bcincuenta y uno\b/g, value: '51' },
+      
+      // 40-49
+      { pattern: /\bcuarenta y nueve\b/g, value: '49' },
+      { pattern: /\bcuarenta y ocho\b/g, value: '48' },
+      { pattern: /\bcuarenta y siete\b/g, value: '47' },
+      { pattern: /\bcuarenta y seis\b/g, value: '46' },
+      { pattern: /\bcuarenta y cinco\b/g, value: '45' },
+      { pattern: /\bcuarenta y cuatro\b/g, value: '44' },
+      { pattern: /\bcuarenta y tres\b/g, value: '43' },
+      { pattern: /\bcuarenta y dos\b/g, value: '42' },
+      { pattern: /\bcuarenta y uno\b/g, value: '41' },
+      
+      // 30-39
+      { pattern: /\btreinta y nueve\b/g, value: '39' },
+      { pattern: /\btreinta y ocho\b/g, value: '38' },
+      { pattern: /\btreinta y siete\b/g, value: '37' },
+      { pattern: /\btreinta y seis\b/g, value: '36' },
+      { pattern: /\btreinta y cinco\b/g, value: '35' },
+      { pattern: /\btreinta y cuatro\b/g, value: '34' },
+      { pattern: /\btreinta y tres\b/g, value: '33' },
+      { pattern: /\btreinta y dos\b/g, value: '32' },
+      { pattern: /\btreinta y uno\b/g, value: '31' },
+      
+      // 100+
+      { pattern: /\bciento cuarenta y cinco\b/g, value: '145' },
+      { pattern: /\bciento cuarenta y cuatro\b/g, value: '144' },
+      { pattern: /\bciento cuarenta y tres\b/g, value: '143' },
+      { pattern: /\bciento cuarenta y dos\b/g, value: '142' },
+      { pattern: /\bciento cuarenta y uno\b/g, value: '141' },
+      { pattern: /\bciento cinco\b/g, value: '105' },
+      { pattern: /\bciento cuatro\b/g, value: '104' },
+      { pattern: /\bciento tres\b/g, value: '103' },
+      { pattern: /\bciento dos\b/g, value: '102' },
+      { pattern: /\bciento uno\b/g, value: '101' }
+    ];
     
-    result = result.replace(/\bochenta y uno\b/g, '81');
-    result = result.replace(/\bochenta y dos\b/g, '82');
-    result = result.replace(/\bochenta y tres\b/g, '83');
-    result = result.replace(/\bochenta y cuatro\b/g, '84');
-    result = result.replace(/\bochenta y cinco\b/g, '85');
-    result = result.replace(/\bochenta y seis\b/g, '86');
-    result = result.replace(/\bochenta y siete\b/g, '87');
-    result = result.replace(/\bochenta y ocho\b/g, '88');
-    result = result.replace(/\bochenta y nueve\b/g, '89');
+    // Aplicar patrones compuestos primero
+    compoundPatterns.forEach(({ pattern, value }) => {
+      result = result.replace(pattern, value);
+    });
     
-    result = result.replace(/\bsetenta y uno\b/g, '71');
-    result = result.replace(/\bsetenta y dos\b/g, '72');
-    result = result.replace(/\bsetenta y tres\b/g, '73');
-    result = result.replace(/\bsetenta y cuatro\b/g, '74');
-    result = result.replace(/\bsetenta y cinco\b/g, '75');
-    result = result.replace(/\bsetenta y seis\b/g, '76');
-    result = result.replace(/\bsetenta y siete\b/g, '77');
-    result = result.replace(/\bsetenta y ocho\b/g, '78');
-    result = result.replace(/\bsetenta y nueve\b/g, '79');
-    
-    result = result.replace(/\bsesenta y uno\b/g, '61');
-    result = result.replace(/\bsesenta y dos\b/g, '62');
-    result = result.replace(/\bsesenta y tres\b/g, '63');
-    result = result.replace(/\bsesenta y cuatro\b/g, '64');
-    result = result.replace(/\bsesenta y cinco\b/g, '65');
-    result = result.replace(/\bsesenta y seis\b/g, '66');
-    result = result.replace(/\bsesenta y siete\b/g, '67');
-    result = result.replace(/\bsesenta y ocho\b/g, '68');
-    result = result.replace(/\bsesenta y nueve\b/g, '69');
-    
-    result = result.replace(/\bcincuenta y uno\b/g, '51');
-    result = result.replace(/\bcincuenta y dos\b/g, '52');
-    result = result.replace(/\bcincuenta y tres\b/g, '53');
-    result = result.replace(/\bcincuenta y cuatro\b/g, '54');
-    result = result.replace(/\bcincuenta y cinco\b/g, '55');
-    result = result.replace(/\bcincuenta y seis\b/g, '56');
-    result = result.replace(/\bcincuenta y siete\b/g, '57');
-    result = result.replace(/\bcincuenta y ocho\b/g, '58');
-    result = result.replace(/\bcincuenta y nueve\b/g, '59');
-    
-    result = result.replace(/\bcuarenta y uno\b/g, '41');
-    result = result.replace(/\bcuarenta y dos\b/g, '42');
-    result = result.replace(/\bcuarenta y tres\b/g, '43');
-    result = result.replace(/\bcuarenta y cuatro\b/g, '44');
-    result = result.replace(/\bcuarenta y cinco\b/g, '45');
-    result = result.replace(/\bcuarenta y seis\b/g, '46');
-    result = result.replace(/\bcuarenta y siete\b/g, '47');
-    result = result.replace(/\bcuarenta y ocho\b/g, '48');
-    result = result.replace(/\bcuarenta y nueve\b/g, '49');
-    
-    result = result.replace(/\btreinta y uno\b/g, '31');
-    result = result.replace(/\btreinta y dos\b/g, '32');
-    result = result.replace(/\btreinta y tres\b/g, '33');
-    result = result.replace(/\btreinta y cuatro\b/g, '34');
-    result = result.replace(/\btreinta y cinco\b/g, '35');
-    result = result.replace(/\btreinta y seis\b/g, '36');
-    result = result.replace(/\btreinta y siete\b/g, '37');
-    result = result.replace(/\btreinta y ocho\b/g, '38');
-    result = result.replace(/\btreinta y nueve\b/g, '39');
-    
-    // Casos especiales para números de más de 100
-    result = result.replace(/\bciento uno\b/g, '101');
-    result = result.replace(/\bciento dos\b/g, '102');
-    result = result.replace(/\bciento tres\b/g, '103');
-    result = result.replace(/\bciento cuatro\b/g, '104');
-    result = result.replace(/\bciento cinco\b/g, '105');
-    result = result.replace(/\bciento cuarenta y uno\b/g, '141');
-    result = result.replace(/\bciento cuarenta y dos\b/g, '142');
-    result = result.replace(/\bciento cuarenta y tres\b/g, '143');
-    result = result.replace(/\bciento cuarenta y cuatro\b/g, '144');
-    result = result.replace(/\bciento cuarenta y cinco\b/g, '145');
-    
-    // Luego reemplazar números individuales usando \b para límites de palabra
+    // Luego números individuales
     Object.entries(numberWords).forEach(([word, number]) => {
       const regex = new RegExp(`\\b${word}\\b`, 'gi');
       result = result.replace(regex, number);
@@ -286,26 +312,74 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return suggestions;
   };
 
-  // Función CORREGIDA para buscar siempre sugerencias cuando hay múltiples coincidencias
-  const showProductSuggestions = (query: string, quantity: number) => {
-    console.log('🎭 Mostrando sugerencias para:', query, 'cantidad:', quantity);
+  // NUEVA función para parsear comandos múltiples
+  const parseMultipleCommands = (command: string): { productQuery: string; quantity: number }[] => {
+    console.log('🔄 Parseando comando múltiple:', command);
     
-    const productSuggestions = findProductSuggestions(query);
+    // Convertir números en palabras primero
+    const commandWithNumbers = wordsToNumber(command);
+    console.log('🔢 Con números convertidos:', commandWithNumbers);
     
-    if (productSuggestions.length > 0) {
-      setSuggestions(productSuggestions.slice(0, 5)); // Limitar a 5 sugerencias
-      setPendingQuantity(quantity);
-      setSearchQuery(query);
-      setShowSuggestionsDialog(true);
-      console.log('✅ Diálogo de sugerencias abierto con', productSuggestions.length, 'opciones');
-    } else {
-      console.log('❌ No se encontraron sugerencias');
-      toast({
-        title: "❌ Producto no encontrado",
-        description: `No se encontraron coincidencias para: ${query}`,
-        variant: "destructive",
+    // Separadores comunes
+    const separators = /(?:,\s*y\s*|,\s*|;\s*|\s+y\s+|\s+también\s+)/i;
+    
+    // Dividir por separadores
+    const segments = commandWithNumbers.split(separators);
+    console.log('📝 Segmentos encontrados:', segments);
+    
+    const parsedCommands: { productQuery: string; quantity: number }[] = [];
+    
+    segments.forEach((segment, index) => {
+      const trimmedSegment = segment.trim();
+      if (!trimmedSegment) return;
+      
+      console.log(`🔍 Procesando segmento ${index + 1}:`, trimmedSegment);
+      
+      // Patrón para detectar producto + cantidad
+      const patterns = [
+        /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,  // "vino emina 33"
+        /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,
+      ];
+      
+      for (const pattern of patterns) {
+        const match = trimmedSegment.match(pattern);
+        if (match) {
+          const productQuery = match[1].trim();
+          const quantity = parseFloat(match[2]);
+          
+          if (!isNaN(quantity) && quantity >= 0) {
+            parsedCommands.push({ productQuery, quantity });
+            console.log(`✅ Comando parseado: ${productQuery} -> ${quantity}`);
+            break;
+          }
+        }
+      }
+    });
+    
+    console.log('📋 Total comandos parseados:', parsedCommands.length);
+    return parsedCommands;
+  };
+
+  // NUEVA función para procesar comandos múltiples
+  const processMultipleCommands = (commands: { productQuery: string; quantity: number }[]) => {
+    console.log('🎭 Procesando comandos múltiples:', commands.length);
+    
+    const updates: MultipleProductUpdate[] = [];
+    
+    commands.forEach(({ productQuery, quantity }) => {
+      const suggestions = findProductSuggestions(productQuery);
+      updates.push({
+        productQuery,
+        quantity,
+        suggestions: suggestions.slice(0, 5) // Limitar a 5 sugerencias por producto
       });
-    }
+    });
+    
+    setPendingUpdates(updates);
+    setCurrentUpdateIndex(0);
+    setShowMultipleDialog(true);
+    
+    console.log('✅ Preparados', updates.length, 'productos para actualizar');
   };
 
   // Función para añadir stock a un producto
@@ -340,23 +414,60 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setSearchQuery('');
   };
 
-  // Función CORREGIDA para procesar el comando de voz - SIEMPRE mostrar sugerencias
+  // NUEVA función para manejar selección en comandos múltiples
+  const handleMultipleSuggestionSelect = (suggestion: ProductSuggestion) => {
+    const currentUpdate = pendingUpdates[currentUpdateIndex];
+    
+    console.log('🎯 Selección múltiple:', suggestion.product.Producto, '+', currentUpdate.quantity);
+    addStockToProduct(suggestion.index, currentUpdate.quantity);
+    
+    // Pasar al siguiente producto
+    const nextIndex = currentUpdateIndex + 1;
+    if (nextIndex < pendingUpdates.length) {
+      setCurrentUpdateIndex(nextIndex);
+    } else {
+      // Terminar proceso múltiple
+      setShowMultipleDialog(false);
+      setPendingUpdates([]);
+      setCurrentUpdateIndex(0);
+      
+      toast({
+        title: "🎉 Actualización múltiple completada",
+        description: `Se actualizaron ${pendingUpdates.length} productos`,
+      });
+    }
+  };
+
+  // Función MEJORADA para procesar comandos de voz - SIEMPRE mostrar sugerencias
   const processVoiceCommand = useCallback((command: string) => {
     setIsProcessing(true);
     setLastCommand(command);
     
     console.log('🔍 Procesando comando:', command);
     
-    // Convertir números en palabras a números primero
+    // Detectar si es comando múltiple (contiene separadores)
+    const hasMultipleProducts = /,|;\s*|\s+y\s+|\s+también\s+/i.test(command);
+    
+    if (hasMultipleProducts) {
+      console.log('🎭 Comando múltiple detectado');
+      const commands = parseMultipleCommands(command);
+      
+      if (commands.length > 1) {
+        processMultipleCommands(commands);
+        setTimeout(() => setIsProcessing(false), 1000);
+        return;
+      }
+    }
+    
+    // Procesar comando simple (código existente)
     const commandWithNumbers = wordsToNumber(command);
     console.log('🔄 Comando con números convertidos:', commandWithNumbers);
     
     const lowerCommand = commandWithNumbers.toLowerCase().trim();
     
-    // Patrones mejorados para detectar comandos
     const updatePatterns = [
-      /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,  // "vino emina 33"
-      /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,  // "añadir vino emina 33"
+      /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,
+      /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,
       /(?:actualizar?|cambiar?|poner?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)/i,
     ];
     
@@ -371,8 +482,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         console.log('🎯 Comando de actualización detectado:', { productQuery, quantity });
         
         if (!isNaN(quantity) && quantity >= 0) {
-          // CAMBIO IMPORTANTE: Siempre mostrar sugerencias, nunca selección automática
-          console.log('🔍 Mostrando sugerencias para que el usuario pueda elegir');
           showProductSuggestions(productQuery, quantity);
           commandProcessed = true;
           break;
@@ -384,7 +493,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       console.log('❌ Comando no procesado');
       toast({
         title: "❌ Comando no reconocido",
-        description: "Intenta decir: 'nombre del producto cantidad'",
+        description: "Intenta: 'producto cantidad' o 'producto1 cantidad1, producto2 cantidad2'",
         variant: "destructive",
       });
     }
@@ -615,7 +724,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </CardContent>
       </Card>
 
-      {/* Diálogo de sugerencias MEJORADO */}
+      {/* Diálogo para comandos simples (existente) */}
       <Dialog open={showSuggestionsDialog} onOpenChange={setShowSuggestionsDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -665,28 +774,144 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </DialogContent>
       </Dialog>
 
-      {/* Ayuda de comandos */}
+      {/* NUEVO Diálogo para comandos múltiples */}
+      <Dialog open={showMultipleDialog} onOpenChange={setShowMultipleDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <List className="w-5 h-5" />
+              🎯 Actualización Múltiple - Paso {currentUpdateIndex + 1} de {pendingUpdates.length}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingUpdates.length > 0 && (
+                <>
+                  Selecciona el producto correcto para "{pendingUpdates[currentUpdateIndex]?.productQuery}" 
+                  y añadir {pendingUpdates[currentUpdateIndex]?.quantity} unidades.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {pendingUpdates.length > 0 && (
+            <div className="space-y-4">
+              {/* Progreso visual */}
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${((currentUpdateIndex) / pendingUpdates.length) * 100}%` }}
+                  />
+                </div>
+                <span>{currentUpdateIndex} / {pendingUpdates.length}</span>
+              </div>
+              
+              {/* Lista de todos los productos pendientes */}
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <h4 className="font-medium text-blue-700 mb-2">📋 Productos a actualizar:</h4>
+                <div className="space-y-1 text-sm">
+                  {pendingUpdates.map((update, index) => (
+                    <div 
+                      key={index} 
+                      className={`flex justify-between ${
+                        index === currentUpdateIndex 
+                          ? 'font-bold text-blue-800 bg-blue-100 px-2 py-1 rounded' 
+                          : index < currentUpdateIndex 
+                            ? 'text-green-600 line-through' 
+                            : 'text-gray-600'
+                      }`}
+                    >
+                      <span>{update.productQuery}</span>
+                      <span>+{update.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Sugerencias para el producto actual */}
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                <h4 className="font-medium">Selecciona el producto correcto:</h4>
+                {pendingUpdates[currentUpdateIndex]?.suggestions.map((suggestion, index) => (
+                  <div
+                    key={index}
+                    className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors hover:border-green-400"
+                    onClick={() => handleMultipleSuggestionSelect(suggestion)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="font-medium text-lg">{suggestion.product.Producto}</p>
+                        <p className="text-sm text-gray-600">
+                          Código: {suggestion.product.Material || suggestion.product.Codigo} | 
+                          Stock actual: {suggestion.product.Stock || 0} {suggestion.product.UMB}
+                        </p>
+                        <p className="text-xs text-green-600">
+                          Similitud: {Math.round(suggestion.similarity)}%
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded">
+                        <Plus className="w-5 h-5" />
+                        <span className="font-bold text-lg">{pendingUpdates[currentUpdateIndex]?.quantity}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowMultipleDialog(false);
+                setPendingUpdates([]);
+                setCurrentUpdateIndex(0);
+              }}
+            >
+              Cancelar Todo
+            </Button>
+            
+            {currentUpdateIndex > 0 && (
+              <Button 
+                variant="outline"
+                onClick={() => setCurrentUpdateIndex(currentUpdateIndex - 1)}
+              >
+                ← Anterior
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ayuda de comandos ACTUALIZADA */}
       <Card>
         <CardContent className="p-4">
           <h3 className="font-medium mb-3">💡 Comandos disponibles:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-              <strong>➕ Añadir stock (SUMATORIO):</strong>
+              <strong>➕ Comando simple:</strong>
               <ul className="ml-4 mt-1 space-y-1 text-gray-600">
-                <li>• "Vino Emina doce" (suma 12)</li>
-                <li>• "Cerveza seis" (suma 6)</li>
+                <li>• "Vino Emina doce"</li>
+                <li>• "Cerveza seis"</li>
                 <li>• "Azúcar treinta y cuatro"</li>
-                <li>• "Añadir patatas veinticinco"</li>
               </ul>
             </div>
             <div>
-              <strong>🔍 Si no encuentra exacto:</strong>
+              <strong>🎯 Comandos múltiples (NUEVO):</strong>
               <ul className="ml-4 mt-1 space-y-1 text-gray-600">
-                <li>• Se abrirá un diálogo</li>
-                <li>• Mostrará productos similares</li>
-                <li>• Selecciona el correcto</li>
+                <li>• "Vino Beronia 12, Cerveza 6 y Vodka 8"</li>
+                <li>• "Ginebra Beefeater 5, Whisky 10"</li>
+                <li>• "Azúcar 15 también sal 8"</li>
               </ul>
             </div>
+          </div>
+          
+          <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+            <h4 className="font-medium text-yellow-800 mb-2">🚀 ¡NUEVO! Inventariado rápido:</h4>
+            <p className="text-sm text-yellow-700">
+              Ahora puedes dictar varios productos a la vez separados por comas, "y" o "también". 
+              El sistema te guiará paso a paso para confirmar cada producto.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -701,6 +926,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             <p>🎤 Reconocimiento: {isListening ? 'Activo' : 'Inactivo'}</p>
             <p>🔢 Reconoce números en palabras (doce, treinta y cuatro, etc.)</p>
             <p>🔍 Búsqueda inteligente con sugerencias automáticas</p>
+            <p>🎯 <strong>NUEVO:</strong> Comandos múltiples para inventariado rápido</p>
           </div>
         </CardContent>
       </Card>
