@@ -333,7 +333,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setShowSuggestionsDialog(true);
   };
 
-  // NUEVA función para parsear comandos múltiples
+  // FUNCIÓN CORREGIDA: parseMultipleCommands
   const parseMultipleCommands = (command: string): { productQuery: string; quantity: number }[] => {
     console.log('🔄 Parseando comando múltiple:', command);
     
@@ -341,58 +341,90 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     const commandWithNumbers = wordsToNumber(command);
     console.log('🔢 Con números convertidos:', commandWithNumbers);
     
-    // Separadores comunes
-    const separators = /(?:,\s*y\s*|,\s*|;\s*|\s+y\s+|\s+también\s+)/i;
+    // Separadores más específicos para evitar conflictos
+    const separators = [
+      /\s*,\s*y\s+/gi,          // ", y "
+      /\s*,\s+/gi,              // ", "
+      /\s+y\s+(?=\w)/gi,        // " y " (seguido de palabra)
+      /\s+también\s+/gi,        // " también "
+      /\s*;\s*/gi               // ";"
+    ];
     
-    // Dividir por separadores
-    const segments = commandWithNumbers.split(separators);
+    // Aplicar separadores uno por uno para mejor control
+    let segments = [commandWithNumbers];
+    
+    separators.forEach(separator => {
+      const newSegments: string[] = [];
+      segments.forEach(segment => {
+        newSegments.push(...segment.split(separator));
+      });
+      segments = newSegments;
+    });
+    
     console.log('📝 Segmentos encontrados:', segments);
     
     const parsedCommands: { productQuery: string; quantity: number }[] = [];
     
     segments.forEach((segment, index) => {
       const trimmedSegment = segment.trim();
-      if (!trimmedSegment) return;
+      if (!trimmedSegment || trimmedSegment.length < 3) return;
       
       console.log(`🔍 Procesando segmento ${index + 1}:`, trimmedSegment);
       
-      // Patrón para detectar producto + cantidad
+      // Patrones mejorados para detectar producto + cantidad
       const patterns = [
-        /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,  // "vino emina 33"
-        /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,
+        /^(.+?)\s+(\d+(?:\.\d+)?)$/i,                    // "vino emina 33"
+        /^(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)$/i,  // "añadir vino 33"
+        /^(.+?)\s+cantidad\s+(\d+(?:\.\d+)?)$/i,         // "vino cantidad 33"
       ];
       
+      let matched = false;
       for (const pattern of patterns) {
         const match = trimmedSegment.match(pattern);
         if (match) {
           const productQuery = match[1].trim();
           const quantity = parseFloat(match[2]);
           
-          if (!isNaN(quantity) && quantity >= 0) {
+          if (!isNaN(quantity) && quantity > 0 && productQuery.length > 2) {
             parsedCommands.push({ productQuery, quantity });
-            console.log(`✅ Comando parseado: ${productQuery} -> ${quantity}`);
+            console.log(`✅ Comando parseado: "${productQuery}" -> ${quantity}`);
+            matched = true;
             break;
           }
         }
       }
+      
+      if (!matched) {
+        console.log(`❌ No se pudo parsear el segmento: "${trimmedSegment}"`);
+      }
     });
     
-    console.log('📋 Total comandos parseados:', parsedCommands.length);
+    console.log('📋 Total comandos parseados:', parsedCommands.length, parsedCommands);
     return parsedCommands;
   };
 
-  // NUEVA función para procesar comandos múltiples
+  // FUNCIÓN CORREGIDA: processMultipleCommands
   const processMultipleCommands = (commands: { productQuery: string; quantity: number }[]) => {
-    console.log('🎭 Procesando comandos múltiples:', commands.length);
+    console.log('🎭 Procesando comandos múltiples:', commands.length, commands);
+    
+    if (commands.length === 0) {
+      toast({
+        title: "❌ Error de procesamiento",
+        description: "No se pudieron procesar los comandos múltiples",
+        variant: "destructive",
+      });
+      return;
+    }
     
     const updates: MultipleProductUpdate[] = [];
     
     commands.forEach(({ productQuery, quantity }) => {
+      console.log('🔍 Buscando sugerencias para:', productQuery, 'cantidad:', quantity);
       const suggestions = findProductSuggestions(productQuery);
       updates.push({
         productQuery,
         quantity,
-        suggestions: suggestions.slice(0, 5) // Limitar a 5 sugerencias por producto
+        suggestions: suggestions.slice(0, 5)
       });
     });
     
@@ -400,7 +432,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setCurrentUpdateIndex(0);
     setShowMultipleDialog(true);
     
-    console.log('✅ Preparados', updates.length, 'productos para actualizar');
+    console.log('✅ Preparados', updates.length, 'productos para actualizar:', updates);
   };
 
   // Función para añadir stock a un producto
@@ -459,37 +491,55 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
   };
 
-  // Función MEJORADA para procesar comandos de voz - SIEMPRE mostrar sugerencias
+  // FUNCIÓN CORREGIDA: processVoiceCommand
   const processVoiceCommand = useCallback((command: string) => {
     setIsProcessing(true);
     setLastCommand(command);
     
-    console.log('🔍 Procesando comando:', command);
+    console.log('🔍 Procesando comando completo:', command);
     
-    // Detectar si es comando múltiple (contiene separadores)
-    const hasMultipleProducts = /,|;\s*|\s+y\s+|\s+también\s+/i.test(command);
+    // Detectar si es comando múltiple con separadores más específicos
+    const multipleIndicators = [
+      /,\s*y\s+/i,              // ", y "
+      /,\s+\w/i,                // ", palabra"
+      /\s+y\s+\w+\s+\d+/i,      // " y producto número"
+      /\s+también\s+/i,         // " también "
+      /;\s*/i                   // ";"
+    ];
+    
+    const hasMultipleProducts = multipleIndicators.some(indicator => indicator.test(command));
+    
+    console.log('🎭 ¿Es comando múltiple?', hasMultipleProducts);
     
     if (hasMultipleProducts) {
-      console.log('🎭 Comando múltiple detectado');
+      console.log('🎭 Procesando como comando múltiple');
       const commands = parseMultipleCommands(command);
       
       if (commands.length > 1) {
         processMultipleCommands(commands);
         setTimeout(() => setIsProcessing(false), 1000);
         return;
+      } else if (commands.length === 1) {
+        // Si solo se parseó un comando, procesarlo como simple
+        console.log('🔄 Solo un comando parseado, procesando como simple');
+        const { productQuery, quantity } = commands[0];
+        showProductSuggestions(productQuery, quantity);
+        setTimeout(() => setIsProcessing(false), 1000);
+        return;
       }
     }
     
-    // Procesar comando simple (código existente)
+    // Procesar comando simple
+    console.log('🎯 Procesando como comando simple');
     const commandWithNumbers = wordsToNumber(command);
     console.log('🔄 Comando con números convertidos:', commandWithNumbers);
     
     const lowerCommand = commandWithNumbers.toLowerCase().trim();
     
     const updatePatterns = [
-      /(.+?)\s+(\d+(?:\.\d+)?)\s*$/i,
-      /(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)/i,
-      /(?:actualizar?|cambiar?|poner?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)/i,
+      /^(.+?)\s+(\d+(?:\.\d+)?)$/i,
+      /^(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)$/i,
+      /^(?:actualizar?|cambiar?|poner?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)$/i,
     ];
     
     let commandProcessed = false;
@@ -500,9 +550,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         const productQuery = match[1].trim();
         const quantity = parseFloat(match[2]);
         
-        console.log('🎯 Comando de actualización detectado:', { productQuery, quantity });
+        console.log('🎯 Comando simple detectado:', { productQuery, quantity });
         
-        if (!isNaN(quantity) && quantity >= 0) {
+        if (!isNaN(quantity) && quantity > 0) {
           showProductSuggestions(productQuery, quantity);
           commandProcessed = true;
           break;
@@ -511,7 +561,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
     
     if (!commandProcessed) {
-      console.log('❌ Comando no procesado');
+      console.log('❌ Comando no procesado:', command);
       toast({
         title: "❌ Comando no reconocido",
         description: "Intenta: 'producto cantidad' o 'producto1 cantidad1, producto2 cantidad2'",
