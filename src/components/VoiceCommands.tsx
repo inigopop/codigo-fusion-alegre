@@ -333,7 +333,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setShowSuggestionsDialog(true);
   };
 
-  // FUNCIÓN CORREGIDA: parseMultipleCommands
+  // FUNCIÓN CORREGIDA: parseMultipleCommands - Separación mejorada
   const parseMultipleCommands = (command: string): { productQuery: string; quantity: number }[] => {
     console.log('🔄 Parseando comando múltiple:', command);
     
@@ -341,24 +341,23 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     const commandWithNumbers = wordsToNumber(command);
     console.log('🔢 Con números convertidos:', commandWithNumbers);
     
-    // Separadores más específicos para evitar conflictos
-    const separators = [
-      /\s*,\s*y\s+/gi,          // ", y "
-      /\s*,\s+/gi,              // ", "
-      /\s+y\s+(?=\w)/gi,        // " y " (seguido de palabra)
-      /\s+también\s+/gi,        // " también "
-      /\s*;\s*/gi               // ";"
-    ];
-    
-    // Aplicar separadores uno por uno para mejor control
+    // Separar por ", y " primero
     let segments = [commandWithNumbers];
     
-    separators.forEach(separator => {
-      const newSegments: string[] = [];
-      segments.forEach(segment => {
-        newSegments.push(...segment.split(separator));
-      });
-      segments = newSegments;
+    segments = segments.flatMap(segment => segment.split(/\s*,\s*y\s+/i));
+    
+    // Luego por ", " simple
+    segments = segments.flatMap(segment => segment.split(/\s*,\s+/i));
+    
+    // Finalmente por " y " (solo si hay números alrededor)
+    segments = segments.flatMap(segment => {
+      // Solo dividir por " y " si hay patrón producto-número antes y después
+      const parts = segment.split(/\s+y\s+/i);
+      if (parts.length > 1) {
+        const validParts = parts.filter(part => /\d+/.test(part));
+        return validParts.length > 1 ? parts : [segment];
+      }
+      return [segment];
     });
     
     console.log('📝 Segmentos encontrados:', segments);
@@ -403,9 +402,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return parsedCommands;
   };
 
-  // FUNCIÓN CORREGIDA: processMultipleCommands
+  // FUNCIÓN COMPLETAMENTE REESCRITA: processMultipleCommands
   const processMultipleCommands = (commands: { productQuery: string; quantity: number }[]) => {
-    console.log('🎭 Procesando comandos múltiples:', commands.length, commands);
+    console.log('🎭 INICIO: Procesando comandos múltiples:', commands.length, commands);
     
     if (commands.length === 0) {
       toast({
@@ -416,11 +415,14 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       return;
     }
     
+    // Preparar todas las actualizaciones con sus sugerencias
     const updates: MultipleProductUpdate[] = [];
     
-    commands.forEach(({ productQuery, quantity }) => {
-      console.log('🔍 Buscando sugerencias para:', productQuery, 'cantidad:', quantity);
+    commands.forEach(({ productQuery, quantity }, commandIndex) => {
+      console.log(`🔍 [Comando ${commandIndex + 1}] Buscando: "${productQuery}" cantidad: ${quantity}`);
       const suggestions = findProductSuggestions(productQuery);
+      console.log(`📋 [Comando ${commandIndex + 1}] Encontradas ${suggestions.length} sugerencias`);
+      
       updates.push({
         productQuery,
         quantity,
@@ -428,11 +430,14 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       });
     });
     
+    console.log('✅ PREPARADO: Total actualizaciones preparadas:', updates.length);
+    
+    // Configurar estado para mostrar diálogo múltiple
     setPendingUpdates(updates);
     setCurrentUpdateIndex(0);
     setShowMultipleDialog(true);
     
-    console.log('✅ Preparados', updates.length, 'productos para actualizar:', updates);
+    console.log('🎯 RESULTADO: Mostrando diálogo múltiple con', updates.length, 'productos');
   };
 
   // Función para añadir stock a un producto
@@ -467,19 +472,29 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setSearchQuery('');
   };
 
-  // NUEVA función para manejar selección en comandos múltiples
+  // FUNCIÓN MEJORADA: handleMultipleSuggestionSelect
   const handleMultipleSuggestionSelect = (suggestion: ProductSuggestion) => {
     const currentUpdate = pendingUpdates[currentUpdateIndex];
     
-    console.log('🎯 Selección múltiple:', suggestion.product.Producto, '+', currentUpdate.quantity);
+    console.log(`🎯 [${currentUpdateIndex + 1}/${pendingUpdates.length}] Selección múltiple:`, {
+      producto: suggestion.product.Producto,
+      cantidad: currentUpdate.quantity,
+      índice: suggestion.index
+    });
+    
+    // ACTUALIZAR EL STOCK INMEDIATAMENTE
     addStockToProduct(suggestion.index, currentUpdate.quantity);
     
     // Pasar al siguiente producto
     const nextIndex = currentUpdateIndex + 1;
+    console.log(`🔄 Pasando al siguiente: ${nextIndex} de ${pendingUpdates.length}`);
+    
     if (nextIndex < pendingUpdates.length) {
       setCurrentUpdateIndex(nextIndex);
+      console.log(`➡️ Mostrando producto ${nextIndex + 1}: ${pendingUpdates[nextIndex].productQuery}`);
     } else {
       // Terminar proceso múltiple
+      console.log('🎉 TERMINADO: Todos los productos procesados');
       setShowMultipleDialog(false);
       setPendingUpdates([]);
       setCurrentUpdateIndex(0);
