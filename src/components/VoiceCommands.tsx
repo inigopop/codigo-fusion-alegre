@@ -333,9 +333,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setShowSuggestionsDialog(true);
   };
 
-  // FUNCIÓN COMPLETAMENTE REESCRITA: parseMultipleCommands
+  // FUNCIÓN COMPLETAMENTE REESCRITA: parseMultipleCommands - NUEVA ESTRATEGIA
   const parseMultipleCommands = (command: string): { productQuery: string; quantity: number }[] => {
-    console.log('🔄 Parseando comando múltiple ORIGINAL:', command);
+    console.log('🔄 NUEVO PARSER - Comando original:', command);
     
     // Convertir números en palabras primero
     const commandWithNumbers = wordsToNumber(command);
@@ -343,65 +343,95 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     
     const parsedCommands: { productQuery: string; quantity: number }[] = [];
     
-    // NUEVA ESTRATEGIA: Buscar patrones producto + número de forma secuencial
-    let remainingText = commandWithNumbers.toLowerCase().trim();
+    // NUEVA ESTRATEGIA: Buscar todos los números en el texto
+    const numberMatches = Array.from(commandWithNumbers.matchAll(/\b(\d+(?:\.\d+)?)\b/g));
+    console.log('🔍 Números encontrados:', numberMatches.map(m => m[1]));
     
-    // Patrón para detectar: texto + número (donde texto no contiene números)
-    const productNumberPattern = /^(.*?)(\d+(?:\.\d+)?)\s*(.*)$/;
-    
-    while (remainingText.length > 0) {
-      console.log('🔍 Procesando texto restante:', remainingText);
-      
-      const match = remainingText.match(productNumberPattern);
-      if (!match) {
-        console.log('❌ No se encontró patrón válido en:', remainingText);
-        break;
-      }
-      
-      const [, productPart, quantityStr, afterPart] = match;
-      const quantity = parseFloat(quantityStr);
-      
-      if (isNaN(quantity) || quantity <= 0) {
-        console.log('❌ Cantidad inválida:', quantityStr);
-        break;
-      }
-      
-      // Limpiar el nombre del producto (quitar palabras de separación al final)
-      let productName = productPart.trim();
-      
-      // Remover palabras de separación comunes al final del producto
-      const separatorWords = ['y', 'también', 'tambien', ','];
-      const productWords = productName.split(/\s+/);
-      
-      // Si la última palabra es un separador, removerla
-      if (productWords.length > 1 && separatorWords.includes(productWords[productWords.length - 1])) {
-        productWords.pop();
-        productName = productWords.join(' ');
-      }
-      
-      if (productName.length >= 3) {
-        parsedCommands.push({
-          productQuery: productName,
-          quantity: quantity
-        });
-        console.log(`✅ Comando parseado: "${productName}" -> ${quantity}`);
-      }
-      
-      // Preparar para la siguiente iteración
-      remainingText = afterPart.trim();
-      
-      // Limpiar separadores al inicio del texto restante
-      remainingText = remainingText.replace(/^(y\s+|también\s+|tambien\s+|,\s*)+/i, '').trim();
-      
-      // Prevenir bucles infinitos
-      if (remainingText === productPart.trim() + quantityStr) {
-        console.log('🛑 Detectado bucle infinito, deteniendo');
-        break;
-      }
+    if (numberMatches.length <= 1) {
+      console.log('❌ Solo hay un número o ninguno, no es comando múltiple');
+      return [];
     }
     
-    console.log('📋 RESULTADO FINAL - Total comandos parseados:', parsedCommands.length, parsedCommands);
+    // Si hay múltiples números, intentar dividir el texto por cada número
+    let remainingText = commandWithNumbers.toLowerCase();
+    
+    numberMatches.forEach((match, index) => {
+      const number = parseFloat(match[1]);
+      const numberPosition = match.index!;
+      
+      if (index === 0) {
+        // Para el primer número, el producto va desde el inicio hasta el número
+        const productText = remainingText.substring(0, numberPosition).trim();
+        if (productText.length >= 3) {
+          parsedCommands.push({
+            productQuery: productText,
+            quantity: number
+          });
+          console.log(`✅ Comando ${index + 1}: "${productText}" -> ${number}`);
+        }
+      } else {
+        // Para números siguientes, el producto va desde el número anterior hasta este número
+        const prevMatch = numberMatches[index - 1];
+        const prevNumberEnd = prevMatch.index! + prevMatch[0].length;
+        const productText = remainingText.substring(prevNumberEnd, numberPosition).trim();
+        
+        if (productText.length >= 3) {
+          parsedCommands.push({
+            productQuery: productText,
+            quantity: number
+          });
+          console.log(`✅ Comando ${index + 1}: "${productText}" -> ${number}`);
+        }
+      }
+      
+      // Si es el último número, ver si hay texto después
+      if (index === numberMatches.length - 1) {
+        const textAfter = remainingText.substring(numberPosition + match[0].length).trim();
+        if (textAfter.length >= 3) {
+          // Si hay texto después del último número, podría ser otro producto sin cantidad
+          console.log('⚠️ Texto después del último número:', textAfter, '- podría ser producto sin cantidad');
+        }
+      }
+    });
+    
+    console.log('📋 RESULTADO PARSER MEJORADO:', parsedCommands.length, 'comandos:', parsedCommands);
     return parsedCommands;
+  };
+
+  // FUNCIÓN MEJORADA: detectar comandos múltiples
+  const isMultipleProductCommand = (command: string): boolean => {
+    const commandWithNumbers = wordsToNumber(command);
+    
+    // Contar números en el comando
+    const numberMatches = commandWithNumbers.match(/\b\d+(?:\.\d+)?\b/g);
+    const numberCount = numberMatches ? numberMatches.length : 0;
+    
+    console.log('🔍 Detectando múltiples productos - Números encontrados:', numberCount, numberMatches);
+    
+    // Si hay 2 o más números, probablemente es comando múltiple
+    if (numberCount >= 2) {
+      console.log('✅ Detectado como comando múltiple por múltiples números');
+      return true;
+    }
+    
+    // También buscar separadores tradicionales
+    const multipleIndicators = [
+      /,\s*y\s+/i,
+      /,\s+\w/i,
+      /\s+y\s+\w+\s+\d+/i,
+      /\s+también\s+/i,
+      /;\s*/i
+    ];
+    
+    const hasTraditionalSeparators = multipleIndicators.some(indicator => indicator.test(command));
+    
+    if (hasTraditionalSeparators) {
+      console.log('✅ Detectado como comando múltiple por separadores tradicionales');
+      return true;
+    }
+    
+    console.log('❌ No detectado como comando múltiple');
+    return false;
   };
 
   // FUNCIÓN COMPLETAMENTE REESCRITA: processMultipleCommands
@@ -513,40 +543,33 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setIsProcessing(true);
     setLastCommand(command);
     
-    console.log('🔍 Procesando comando completo:', command);
+    console.log('🔍 PROCESANDO COMANDO:', command);
     
-    // Detectar si es comando múltiple con separadores más específicos
-    const multipleIndicators = [
-      /,\s*y\s+/i,              // ", y "
-      /,\s+\w/i,                // ", palabra"
-      /\s+y\s+\w+\s+\d+/i,      // " y producto número"
-      /\s+también\s+/i,         // " también "
-      /;\s*/i                   // ";"
-    ];
+    // NUEVA DETECCIÓN de comandos múltiples
+    const isMultiple = isMultipleProductCommand(command);
+    console.log('🎭 ¿Es comando múltiple?', isMultiple);
     
-    const hasMultipleProducts = multipleIndicators.some(indicator => indicator.test(command));
-    
-    console.log('🎭 ¿Es comando múltiple?', hasMultipleProducts);
-    
-    if (hasMultipleProducts) {
+    if (isMultiple) {
       console.log('🎭 Procesando como comando múltiple');
       const commands = parseMultipleCommands(command);
       
       if (commands.length > 1) {
+        console.log('✅ Múltiples comandos parseados correctamente:', commands.length);
         processMultipleCommands(commands);
         setTimeout(() => setIsProcessing(false), 1000);
         return;
       } else if (commands.length === 1) {
-        // Si solo se parseó un comando, procesarlo como simple
         console.log('🔄 Solo un comando parseado, procesando como simple');
         const { productQuery, quantity } = commands[0];
         showProductSuggestions(productQuery, quantity);
         setTimeout(() => setIsProcessing(false), 1000);
         return;
+      } else {
+        console.log('❌ No se pudieron parsear comandos múltiples, intentando como simple');
       }
     }
     
-    // Procesar comando simple
+    // Procesar comando simple (código existente)
     console.log('🎯 Procesando como comando simple');
     const commandWithNumbers = wordsToNumber(command);
     console.log('🔄 Comando con números convertidos:', commandWithNumbers);
@@ -581,7 +604,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       console.log('❌ Comando no procesado:', command);
       toast({
         title: "❌ Comando no reconocido",
-        description: "Intenta: 'producto cantidad' o 'producto1 cantidad1, producto2 cantidad2'",
+        description: "Intenta: 'producto cantidad' o 'producto1 cantidad1 producto2 cantidad2'",
         variant: "destructive",
       });
     }
