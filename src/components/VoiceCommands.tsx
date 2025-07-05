@@ -333,72 +333,74 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setShowSuggestionsDialog(true);
   };
 
-  // FUNCIÓN CORREGIDA: parseMultipleCommands - Separación mejorada
+  // FUNCIÓN COMPLETAMENTE REESCRITA: parseMultipleCommands
   const parseMultipleCommands = (command: string): { productQuery: string; quantity: number }[] => {
-    console.log('🔄 Parseando comando múltiple:', command);
+    console.log('🔄 Parseando comando múltiple ORIGINAL:', command);
     
     // Convertir números en palabras primero
     const commandWithNumbers = wordsToNumber(command);
     console.log('🔢 Con números convertidos:', commandWithNumbers);
     
-    // Separar por ", y " primero
-    let segments = [commandWithNumbers];
-    
-    segments = segments.flatMap(segment => segment.split(/\s*,\s*y\s+/i));
-    
-    // Luego por ", " simple
-    segments = segments.flatMap(segment => segment.split(/\s*,\s+/i));
-    
-    // Finalmente por " y " (solo si hay números alrededor)
-    segments = segments.flatMap(segment => {
-      // Solo dividir por " y " si hay patrón producto-número antes y después
-      const parts = segment.split(/\s+y\s+/i);
-      if (parts.length > 1) {
-        const validParts = parts.filter(part => /\d+/.test(part));
-        return validParts.length > 1 ? parts : [segment];
-      }
-      return [segment];
-    });
-    
-    console.log('📝 Segmentos encontrados:', segments);
-    
     const parsedCommands: { productQuery: string; quantity: number }[] = [];
     
-    segments.forEach((segment, index) => {
-      const trimmedSegment = segment.trim();
-      if (!trimmedSegment || trimmedSegment.length < 3) return;
-      
-      console.log(`🔍 Procesando segmento ${index + 1}:`, trimmedSegment);
-      
-      // Patrones mejorados para detectar producto + cantidad
-      const patterns = [
-        /^(.+?)\s+(\d+(?:\.\d+)?)$/i,                    // "vino emina 33"
-        /^(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)$/i,  // "añadir vino 33"
-        /^(.+?)\s+cantidad\s+(\d+(?:\.\d+)?)$/i,         // "vino cantidad 33"
-      ];
-      
-      let matched = false;
-      for (const pattern of patterns) {
-        const match = trimmedSegment.match(pattern);
-        if (match) {
-          const productQuery = match[1].trim();
-          const quantity = parseFloat(match[2]);
-          
-          if (!isNaN(quantity) && quantity > 0 && productQuery.length > 2) {
-            parsedCommands.push({ productQuery, quantity });
-            console.log(`✅ Comando parseado: "${productQuery}" -> ${quantity}`);
-            matched = true;
-            break;
-          }
-        }
-      }
-      
-      if (!matched) {
-        console.log(`❌ No se pudo parsear el segmento: "${trimmedSegment}"`);
-      }
-    });
+    // NUEVA ESTRATEGIA: Buscar patrones producto + número de forma secuencial
+    let remainingText = commandWithNumbers.toLowerCase().trim();
     
-    console.log('📋 Total comandos parseados:', parsedCommands.length, parsedCommands);
+    // Patrón para detectar: texto + número (donde texto no contiene números)
+    const productNumberPattern = /^(.*?)(\d+(?:\.\d+)?)\s*(.*)$/;
+    
+    while (remainingText.length > 0) {
+      console.log('🔍 Procesando texto restante:', remainingText);
+      
+      const match = remainingText.match(productNumberPattern);
+      if (!match) {
+        console.log('❌ No se encontró patrón válido en:', remainingText);
+        break;
+      }
+      
+      const [, productPart, quantityStr, afterPart] = match;
+      const quantity = parseFloat(quantityStr);
+      
+      if (isNaN(quantity) || quantity <= 0) {
+        console.log('❌ Cantidad inválida:', quantityStr);
+        break;
+      }
+      
+      // Limpiar el nombre del producto (quitar palabras de separación al final)
+      let productName = productPart.trim();
+      
+      // Remover palabras de separación comunes al final del producto
+      const separatorWords = ['y', 'también', 'tambien', ','];
+      const productWords = productName.split(/\s+/);
+      
+      // Si la última palabra es un separador, removerla
+      if (productWords.length > 1 && separatorWords.includes(productWords[productWords.length - 1])) {
+        productWords.pop();
+        productName = productWords.join(' ');
+      }
+      
+      if (productName.length >= 3) {
+        parsedCommands.push({
+          productQuery: productName,
+          quantity: quantity
+        });
+        console.log(`✅ Comando parseado: "${productName}" -> ${quantity}`);
+      }
+      
+      // Preparar para la siguiente iteración
+      remainingText = afterPart.trim();
+      
+      // Limpiar separadores al inicio del texto restante
+      remainingText = remainingText.replace(/^(y\s+|también\s+|tambien\s+|,\s*)+/i, '').trim();
+      
+      // Prevenir bucles infinitos
+      if (remainingText === productPart.trim() + quantityStr) {
+        console.log('🛑 Detectado bucle infinito, deteniendo');
+        break;
+      }
+    }
+    
+    console.log('📋 RESULTADO FINAL - Total comandos parseados:', parsedCommands.length, parsedCommands);
     return parsedCommands;
   };
 
