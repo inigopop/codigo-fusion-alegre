@@ -181,9 +181,7 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-32 min-w-[120px]">MATERIAL</TableHead>
                 <TableHead className="min-w-[200px]">PRODUCTO</TableHead>
-                <TableHead className="w-20 min-w-[60px]">UMB</TableHead>
                 <TableHead className="w-32 min-w-[100px]">STOCK</TableHead>
                 <TableHead className="w-32 min-w-[120px]">Acciones</TableHead>
               </TableRow>
@@ -203,16 +201,13 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
                     key={product.uniqueId}
                     className={isHighlighted ? 'bg-green-100 border-green-300 animate-pulse' : ''}
                   >
-                    <TableCell className="font-mono text-sm font-bold break-all">
-                      {materialCode}
-                    </TableCell>
                     <TableCell className="font-medium">
                       <div className="break-words" title={productName}>
                         {productName}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-center font-semibold">
-                      {unit}
+                      <div className="text-xs text-gray-500 mt-1">
+                        {materialCode}
+                      </div>
                     </TableCell>
                     <TableCell className={isHighlighted ? 'bg-green-200 font-bold text-green-800' : ''}>
                       {isEditing ? (

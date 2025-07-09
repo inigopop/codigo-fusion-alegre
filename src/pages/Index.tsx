@@ -291,10 +291,10 @@ const Index = () => {
         )}
 
         <Tabs defaultValue="excel" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
             <TabsTrigger 
               value="excel" 
-              className={`flex items-center gap-2 ${
+              className={`flex items-center justify-center gap-1 px-2 py-3 text-xs sm:text-sm h-auto ${
                 excelData.length === 0 
                   ? 'data-[state=active]:bg-green-500 data-[state=active]:text-white bg-green-100 text-green-700 hover:bg-green-200' 
                   : 'data-[state=active]:bg-red-500 data-[state=active]:text-white bg-red-100 text-red-700 hover:bg-red-200'
@@ -311,42 +311,38 @@ const Index = () => {
                 }
               }}
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              {excelData.length === 0 ? 'Cargar Archivo' : 'Archivo Cargado ✓'}
+              <FileSpreadsheet className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="truncate">
+                {excelData.length === 0 ? 'Cargar' : 'Cargado ✓'}
+              </span>
             </TabsTrigger>
             <TabsTrigger 
               value="inventory" 
-              className="flex items-center gap-2 data-[state=active]:bg-blue-500 data-[state=active]:text-white bg-blue-100 text-blue-700 hover:bg-blue-200"
+              className="flex items-center justify-center gap-1 px-2 py-3 text-xs sm:text-sm h-auto data-[state=active]:bg-blue-500 data-[state=active]:text-white bg-blue-100 text-blue-700 hover:bg-blue-200"
             >
-              <ClipboardList className="w-4 h-4" />
-              Inventario ({excelData.length})
+              <ClipboardList className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="truncate">
+                Inventario
+              </span>
             </TabsTrigger>
             <TabsTrigger 
               value="voice" 
-              className="flex items-center gap-2 data-[state=active]:bg-yellow-500 data-[state=active]:text-black bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+              className="flex items-center justify-center gap-1 px-2 py-3 text-xs sm:text-sm h-auto data-[state=active]:bg-yellow-500 data-[state=active]:text-black bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
             >
-              <Mic className="w-4 h-4" />
-              Control por Voz
+              <Mic className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="truncate">
+                Voz
+              </span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="excel">
-            <Card>
-              <CardHeader>
-                <CardTitle>Carga de Archivo del Economato</CardTitle>
-                <CardDescription>
-                  Importa el archivo Excel. Detecta automáticamente: Material | Código | Producto | Stock
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ExcelProcessor 
-                  onDataProcessed={handleDataProcessed}
-                  existingData={excelData}
-                  originalHeader={originalHeader}
-                  originalStyles={originalStyles}
-                />
-              </CardContent>
-            </Card>
+            <ExcelProcessor 
+              onDataProcessed={handleDataProcessed}
+              existingData={excelData}
+              originalHeader={originalHeader}
+              originalStyles={originalStyles}
+            />
           </TabsContent>
 
           <TabsContent value="inventory">
@@ -358,22 +354,12 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="voice">
-            <Card>
-              <CardHeader>
-                <CardTitle>Control por Voz del Inventario</CardTitle>
-                <CardDescription>
-                  Busca productos y actualiza el stock usando comandos de voz
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <VoiceCommands 
-                  excelData={excelData}
-                  onUpdateStock={handleUpdateStock}
-                  isListening={isListening}
-                  setIsListening={setIsListening}
-                />
-              </CardContent>
-            </Card>
+            <VoiceCommands 
+              excelData={excelData}
+              onUpdateStock={handleUpdateStock}
+              isListening={isListening}
+              setIsListening={setIsListening}
+            />
           </TabsContent>
         </Tabs>
       </div>
