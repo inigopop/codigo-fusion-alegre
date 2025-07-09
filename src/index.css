@@ -2,93 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Apple Design System Colors - Light Mode */
+    --background: 248 250 252; /* Cool Gray 50 */
+    --foreground: 15 23 42; /* Slate 900 */
+    --card: 255 255 255; /* Pure White */
+    --card-foreground: 15 23 42; /* Slate 900 */
+    --popover: 255 255 255; /* Pure White */
+    --popover-foreground: 15 23 42; /* Slate 900 */
+    --primary: 59 130 246; /* Blue 500 - Apple Blue */
+    --primary-foreground: 255 255 255; /* White */
+    --secondary: 241 245 249; /* Slate 100 */
+    --secondary-foreground: 51 65 85; /* Slate 700 */
+    --muted: 248 250 252; /* Slate 50 */
+    --muted-foreground: 100 116 139; /* Slate 500 */
+    --accent: 240 249 255; /* Blue 50 */
+    --accent-foreground: 30 64 175; /* Blue 800 */
+    --destructive: 239 68 68; /* Red 500 */
+    --destructive-foreground: 255 255 255; /* White */
+    --border: 226 232 240; /* Slate 200 */
+    --input: 241 245 249; /* Slate 100 */
+    --ring: 59 130 246; /* Blue 500 */
+    --chart-1: 59 130 246; /* Blue 500 */
+    --chart-2: 16 185 129; /* Emerald 500 */
+    --chart-3: 245 158 11; /* Amber 500 */
+    --chart-4: 239 68 68; /* Red 500 */
+    --chart-5: 139 92 246; /* Violet 500 */
+    --radius: 12px; /* Apple-style radius */
+    
+    /* Apple Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Apple Design System Colors - Dark Mode */
+    --background: 0 0 0; /* Pure Black */
+    --foreground: 248 250 252; /* Slate 50 */
+    --card: 15 15 15; /* Very Dark Gray */
+    --card-foreground: 248 250 252; /* Slate 50 */
+    --popover: 15 15 15; /* Very Dark Gray */
+    --popover-foreground: 248 250 252; /* Slate 50 */
+    --primary: 99 179 255; /* Light Blue 400 */
+    --primary-foreground: 15 23 42; /* Slate 900 */
+    --secondary: 30 30 30; /* Dark Gray */
+    --secondary-foreground: 226 232 240; /* Slate 200 */
+    --muted: 20 20 20; /* Very Dark Gray */
+    --muted-foreground: 148 163 184; /* Slate 400 */
+    --accent: 30 30 30; /* Dark Gray */
+    --accent-foreground: 148 163 184; /* Slate 400 */
+    --destructive: 248 113 113; /* Red 400 */
+    --destructive-foreground: 248 250 252; /* Slate 50 */
+    --border: 39 39 42; /* Zinc 800 */
+    --input: 30 30 30; /* Dark Gray */
+    --ring: 99 179 255; /* Light Blue 400 */
+    --chart-1: 99 179 255; /* Light Blue 400 */
+    --chart-2: 52 211 153; /* Emerald 400 */
+    --chart-3: 251 191 36; /* Amber 400 */
+    --chart-4: 248 113 113; /* Red 400 */
+    --chart-5: 167 139 250; /* Violet 400 */
   }
 }
 
@@ -96,8 +71,30 @@
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'cv02', 'cv03', 'cv04';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Apple-style animations and transitions */
+@layer components {
+  .apple-transition {
+    @apply transition-all duration-200 ease-out;
+  }
+  
+  .apple-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-lg;
+  }
+  
+  .apple-button {
+    @apply apple-transition rounded-xl font-medium;
+  }
+  
+  .apple-input {
+    @apply apple-transition rounded-xl border-border/30 bg-input/50 backdrop-blur-sm;
   }
 }

@@ -153,32 +153,37 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Inventario - {filteredProducts.length} de {data.length} productos</CardTitle>
-        <div className="flex items-center gap-2 mt-4">
-          <Search className="w-4 h-4 flex-shrink-0" />
-          <Input
-            placeholder="Buscar por código o producto..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-0"
-          />
-          {searchTerm && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setSearchTerm('')}
-              className="flex-shrink-0"
-            >
-              Limpiar
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div className="apple-card p-6 shadow-apple-lg">
+      <div className="mb-6">
+        <h2 className="text-2xl font-display font-light text-foreground mb-2">
+          Inventario
+        </h2>
+        <p className="text-muted-foreground">
+          {filteredProducts.length} de {data.length} productos
+        </p>
+      </div>
+      {/* Search Bar */}
+      <div className="relative mb-6">
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+        <Input
+          placeholder="Buscar por código o producto..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="apple-input pl-12 py-3 text-base placeholder:text-muted-foreground/60"
+        />
+        {searchTerm && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setSearchTerm('')}
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 apple-button text-muted-foreground hover:text-foreground"
+          >
+            Limpiar
+          </Button>
+        )}
+      </div>
         {/* Vista móvil - Tarjetas */}
-        <div className="block md:hidden space-y-3">
+        <div className="block md:hidden space-y-4">
           {filteredProducts.map((product) => {
             const isEditing = editingProductId === product.uniqueId;
             const displayStock = Number(product.Stock || 0);
@@ -188,26 +193,28 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
             const productName = getProductName(product);
             
             return (
-              <Card 
+              <div 
                 key={product.uniqueId}
-                className={`p-4 ${isHighlighted ? 'bg-green-100 border-green-300 animate-pulse' : ''}`}
+                className={`apple-card p-6 ${isHighlighted ? 'bg-primary/5 border-primary/20 animate-pulse' : ''}`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0 pr-3">
-                    <h3 className="font-medium text-base leading-tight mb-1">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <h3 className="font-medium text-base leading-tight mb-2 text-foreground">
                       {productName}
                     </h3>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       {materialCode}
                     </p>
                   </div>
                   
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-6">
                     {/* Stock */}
                     <div className="text-center">
-                      <div className="text-xs text-gray-500 mb-1">STOCK</div>
+                      <div className="text-xs text-muted-foreground mb-2 font-medium tracking-wide uppercase">
+                        STOCK
+                      </div>
                       {isEditing ? (
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                           <Input
                             ref={inputRef}
                             type="number"
@@ -217,7 +224,7 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
                             onChange={handleInputChange}
                             onKeyDown={handleKeyDown}
                             placeholder={isAddMode ? "Sumar" : "Total"}
-                            className="w-20 text-center text-base font-mono"
+                            className="apple-input w-24 text-center text-base font-mono"
                             inputMode="decimal"
                             autoComplete="off"
                             autoCorrect="off"
@@ -225,37 +232,37 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
                             spellCheck={false}
                           />
                           {isAddMode && (
-                            <p className="text-xs text-green-600">
+                            <p className="text-xs text-primary font-medium">
                               +{editValue || '0'} = {displayStock + (parseFloat(editValue) || 0)}
                             </p>
                           )}
                         </div>
                       ) : (
-                        <div className={`text-xl font-mono font-bold ${isHighlighted ? 'text-green-800' : ''}`}>
+                        <div className={`text-2xl font-mono font-semibold ${isHighlighted ? 'text-primary' : 'text-foreground'}`}>
                           {displayStock.toFixed(1)}
                         </div>
                       )}
                     </div>
                     
                     {/* Acciones */}
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-3">
                       {isEditing ? (
                         <>
                           <Button 
                             size="sm" 
                             variant="default"
                             onClick={saveEdit}
-                            className="w-10 h-10 p-0 bg-green-600 hover:bg-green-700"
+                            className="apple-button w-12 h-12 p-0 bg-primary hover:bg-primary/90 shadow-apple-md"
                           >
-                            <Save className="w-4 h-4" />
+                            <Save className="w-5 h-5" />
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline"
                             onClick={cancelEdit}
-                            className="w-10 h-10 p-0"
+                            className="apple-button w-12 h-12 p-0 border-border/50 hover:bg-muted/50"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-5 h-5" />
                           </Button>
                         </>
                       ) : (
@@ -264,26 +271,26 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
                             size="sm" 
                             variant="ghost"
                             onClick={() => startEdit(product.uniqueId, displayStock, false)}
-                            className="w-10 h-10 p-0 hover:bg-blue-50"
+                            className="apple-button w-12 h-12 p-0 hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                             title="Editar"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-5 h-5" />
                           </Button>
                           <Button 
                             size="sm" 
                             variant="ghost"
                             onClick={() => startEdit(product.uniqueId, displayStock, true)}
-                            className="w-10 h-10 p-0 hover:bg-green-50 text-green-600"
+                            className="apple-button w-12 h-12 p-0 hover:bg-primary/10 text-primary hover:text-primary"
                             title="Sumar"
                           >
-                            <Plus className="w-4 h-4" />
+                            <Plus className="w-5 h-5" />
                           </Button>
                         </>
                       )}
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
             );
           })}
         </div>
@@ -403,19 +410,23 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
         </div>
         
         {filteredProducts.length === 0 && searchTerm && (
-          <div className="text-center py-8 text-gray-500">
-            No se encontraron productos que coincidan con "{searchTerm}"
+          <div className="text-center py-12 text-muted-foreground">
+            <div className="w-16 h-16 bg-muted rounded-2xl mx-auto mb-4 flex items-center justify-center">
+              <Search className="w-8 h-8" />
+            </div>
+            <p className="text-lg font-medium mb-2">Sin resultados</p>
+            <p className="text-sm">No se encontraron productos que coincidan con "{searchTerm}"</p>
           </div>
         )}
         
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-          <p className="text-sm text-blue-700">
-            <strong>💡 Tip:</strong> Usa el botón <Edit className="w-4 h-4 inline mx-1" /> para reemplazar el stock total, 
+        <div className="mt-8 p-6 bg-muted/30 rounded-2xl border border-border/30">
+          <p className="text-sm text-muted-foreground font-medium">
+            💡 <strong>Tip:</strong> Usa el botón <Edit className="w-4 h-4 inline mx-1" /> para reemplazar el stock total, 
             o el botón <Plus className="w-4 h-4 inline mx-1" /> para sumar cantidad al stock existente.
           </p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

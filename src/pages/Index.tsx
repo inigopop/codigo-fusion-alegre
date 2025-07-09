@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import ExcelProcessor from "@/components/ExcelProcessor";
 import VoiceCommands from "@/components/VoiceCommands";
 import InventoryTable from "@/components/InventoryTable";
-import { FileSpreadsheet, Mic, ClipboardList, Download } from "lucide-react";
+import { FileText, Mic, Package, Download, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as ExcelJS from 'exceljs';
 
@@ -16,9 +14,10 @@ const Index = () => {
   const [fileName, setFileName] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
   const [highlightedCells, setHighlightedCells] = useState<Set<number>>(new Set());
+  const [activeTab, setActiveTab] = useState<'import' | 'inventory' | 'voice'>('import');
   const { toast } = useToast();
 
-  const handleDataProcessed = (data: any[], header: any, styles: any, filename?: string) => {
+  const handleDataLoaded = (data: any[], header: any, styles: any, filename?: string) => {
     console.log('Datos procesados:', data.length, 'productos');
     console.log('Muestra:', data.slice(0, 3));
     console.log('Campos disponibles:', data.length > 0 ? Object.keys(data[0]) : []);
@@ -28,6 +27,11 @@ const Index = () => {
     setOriginalStyles(styles);
     if (filename) {
       setFileName(filename);
+    }
+    
+    // Cambiar automáticamente a la vista de inventario cuando se cargan datos
+    if (data.length > 0) {
+      setActiveTab('inventory');
     }
   };
 
@@ -254,115 +258,152 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Sistema de Inventario Hotelero
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <header className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-display font-light text-foreground mb-3 tracking-tight">
+            Inventario Voz
           </h1>
-          <p className="text-xl text-gray-600">
-            Gestiona el inventario del economato con control por voz
+          <p className="text-lg text-muted-foreground font-light max-w-2xl mx-auto leading-relaxed">
+            Sistema de gestión de inventario con reconocimiento de voz inteligente
           </p>
+        </header>
+
+        {/* Navigation Tabs */}
+        <div className="flex justify-center mb-10">
+          <div className="apple-card p-2 inline-flex">
+            <button
+              onClick={() => setActiveTab('import')}
+              className={`apple-button px-6 py-3 text-sm font-medium ${
+                activeTab === 'import'
+                  ? 'bg-primary text-primary-foreground shadow-apple-md'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Archivo</span>
+              <span className="sm:hidden">📁</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('inventory')}
+              className={`apple-button px-6 py-3 text-sm font-medium ${
+                activeTab === 'inventory'
+                  ? 'bg-primary text-primary-foreground shadow-apple-md'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Package className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Inventario</span>
+              <span className="sm:hidden">📦</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('voice')}
+              className={`apple-button px-6 py-3 text-sm font-medium ${
+                activeTab === 'voice'
+                  ? 'bg-primary text-primary-foreground shadow-apple-md'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Mic className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Control por Voz</span>
+              <span className="sm:hidden">🎤</span>
+            </button>
+          </div>
         </div>
 
-        {/* Estado del sistema */}
-        <Card className="mb-6 border-green-200 bg-green-50">
-          <CardContent className="p-4">
-            <h3 className="font-medium text-green-700 mb-2">📊 Estado del Sistema:</h3>
-            <div className="grid grid-cols-3 gap-4 text-sm text-green-600">
-              <div>✅ Productos: {excelData.length}</div>
-              <div>📁 Archivo: {fileName || 'No cargado'}</div>
-              <div>🎤 Voz: {isListening ? 'Activo' : 'Inactivo'}</div>
+        {/* Content Area */}
+        <div className="space-y-8">
+          {activeTab === 'import' && (
+            <div className="animate-fade-in">
+              <div className="apple-card p-8 max-w-2xl mx-auto">
+                <div className="text-center mb-8">
+                  <div className="w-16 h-16 bg-primary/10 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                    <Upload className="w-8 h-8 text-primary" />
+                  </div>
+                  <h2 className="text-2xl font-display font-light text-foreground mb-2">
+                    Cargar Inventario
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Selecciona tu archivo Excel para comenzar
+                  </p>
+                </div>
+                
+                <ExcelProcessor 
+                  onDataLoaded={handleDataLoaded}
+                  highlightedCells={highlightedCells}
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
 
+          {activeTab === 'inventory' && excelData.length > 0 && (
+            <div className="animate-fade-in">
+              <InventoryTable 
+                data={excelData}
+                onUpdateStock={handleUpdateStock}
+                highlightedCells={highlightedCells}
+              />
+            </div>
+          )}
+
+          {activeTab === 'inventory' && excelData.length === 0 && (
+            <div className="animate-fade-in">
+              <div className="apple-card p-12 text-center max-w-lg mx-auto">
+                <div className="w-20 h-20 bg-muted rounded-2xl mx-auto mb-6 flex items-center justify-center">
+                  <Package className="w-10 h-10 text-muted-foreground" />
+                </div>
+                <h3 className="text-xl font-display font-light text-foreground mb-3">
+                  Sin datos de inventario
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Carga un archivo Excel primero para ver tu inventario
+                </p>
+                <Button 
+                  onClick={() => setActiveTab('import')}
+                  className="apple-button bg-primary hover:bg-primary/90"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Cargar archivo
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'voice' && (
+            <div className="animate-fade-in max-w-4xl mx-auto">
+              <VoiceCommands 
+                excelData={excelData}
+                onUpdateStock={handleUpdateStock}
+                isListening={isListening}
+                setIsListening={setIsListening}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Export Button */}
         {excelData.length > 0 && (
-          <div className="mb-6 flex justify-center">
+          <div className="mt-12 flex justify-center">
             <Button 
               onClick={exportExcel}
-              size="sm"
-              className="flex items-center gap-1 bg-green-600 hover:bg-green-700 px-3 py-2 text-sm"
+              size="lg"
+              className="apple-button bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 shadow-apple-lg"
             >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">📥 Exportar Excel</span>
-              <span className="sm:hidden">📥 Exportar</span>
+              <Download className="w-5 h-5 mr-3" />
+              <span className="hidden sm:inline">Exportar Excel Actualizado</span>
+              <span className="sm:hidden">Exportar</span>
+              <span className="ml-2 text-xs opacity-75">({excelData.length} productos)</span>
             </Button>
           </div>
         )}
 
-        <Tabs defaultValue="excel" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6 h-auto">
-            <TabsTrigger 
-              value="excel" 
-              className={`flex items-center justify-center gap-1 px-2 py-3 text-xs sm:text-sm h-auto ${
-                excelData.length === 0 
-                  ? 'data-[state=active]:bg-green-500 data-[state=active]:text-white bg-green-100 text-green-700 hover:bg-green-200' 
-                  : 'data-[state=active]:bg-red-500 data-[state=active]:text-white bg-red-100 text-red-700 hover:bg-red-200'
-              }`}
-              onClick={() => {
-                // Si no hay datos, activar automáticamente el input de archivo
-                if (excelData.length === 0) {
-                  setTimeout(() => {
-                    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-                    if (fileInput) {
-                      fileInput.click();
-                    }
-                  }, 100);
-                }
-              }}
-            >
-              <FileSpreadsheet className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">
-                {excelData.length === 0 ? 'Cargar' : 'Cargado ✓'}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="inventory" 
-              className="flex items-center justify-center gap-1 px-2 py-3 text-xs sm:text-sm h-auto data-[state=active]:bg-blue-500 data-[state=active]:text-white bg-blue-100 text-blue-700 hover:bg-blue-200"
-            >
-              <ClipboardList className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">
-                Inventario
-              </span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="voice" 
-              className="flex items-center justify-center gap-1 px-2 py-3 text-xs sm:text-sm h-auto data-[state=active]:bg-yellow-500 data-[state=active]:text-black bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
-            >
-              <Mic className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-              <span className="truncate">
-                Voz
-              </span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="excel">
-            <ExcelProcessor 
-              onDataProcessed={handleDataProcessed}
-              existingData={excelData}
-              originalHeader={originalHeader}
-              originalStyles={originalStyles}
-            />
-          </TabsContent>
-
-          <TabsContent value="inventory">
-            <InventoryTable 
-              data={excelData}
-              onUpdateStock={handleUpdateStock}
-              highlightedCells={highlightedCells}
-            />
-          </TabsContent>
-
-          <TabsContent value="voice">
-            <VoiceCommands 
-              excelData={excelData}
-              onUpdateStock={handleUpdateStock}
-              isListening={isListening}
-              setIsListening={setIsListening}
-            />
-          </TabsContent>
-        </Tabs>
+        {/* Footer */}
+        <footer className="text-center mt-16 pb-8">
+          <p className="text-sm text-muted-foreground font-light">
+            Sistema de inventario inteligente · Versión 2.0
+          </p>
+        </footer>
       </div>
     </div>
   );
