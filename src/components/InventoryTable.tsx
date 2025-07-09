@@ -177,7 +177,119 @@ const InventoryTable = ({ data, onUpdateStock, highlightedCells = new Set() }: I
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
+        {/* Vista móvil - Tarjetas */}
+        <div className="block md:hidden space-y-3">
+          {filteredProducts.map((product) => {
+            const isEditing = editingProductId === product.uniqueId;
+            const displayStock = Number(product.Stock || 0);
+            const isHighlighted = highlightedCells.has(product.originalIndex);
+            
+            const materialCode = getMaterialCode(product);
+            const productName = getProductName(product);
+            
+            return (
+              <Card 
+                key={product.uniqueId}
+                className={`p-4 ${isHighlighted ? 'bg-green-100 border-green-300 animate-pulse' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0 pr-3">
+                    <h3 className="font-medium text-base leading-tight mb-1">
+                      {productName}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {materialCode}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    {/* Stock */}
+                    <div className="text-center">
+                      <div className="text-xs text-gray-500 mb-1">STOCK</div>
+                      {isEditing ? (
+                        <div className="space-y-1">
+                          <Input
+                            ref={inputRef}
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={editValue}
+                            onChange={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder={isAddMode ? "Sumar" : "Total"}
+                            className="w-20 text-center text-base font-mono"
+                            inputMode="decimal"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                          />
+                          {isAddMode && (
+                            <p className="text-xs text-green-600">
+                              +{editValue || '0'} = {displayStock + (parseFloat(editValue) || 0)}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className={`text-xl font-mono font-bold ${isHighlighted ? 'text-green-800' : ''}`}>
+                          {displayStock.toFixed(1)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Acciones */}
+                    <div className="flex flex-col gap-2">
+                      {isEditing ? (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="default"
+                            onClick={saveEdit}
+                            className="w-10 h-10 p-0 bg-green-600 hover:bg-green-700"
+                          >
+                            <Save className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={cancelEdit}
+                            className="w-10 h-10 p-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => startEdit(product.uniqueId, displayStock, false)}
+                            className="w-10 h-10 p-0 hover:bg-blue-50"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => startEdit(product.uniqueId, displayStock, true)}
+                            className="w-10 h-10 p-0 hover:bg-green-50 text-green-600"
+                            title="Sumar"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Vista desktop - Tabla */}
+        <div className="hidden md:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
