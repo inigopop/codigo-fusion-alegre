@@ -278,14 +278,15 @@ const Index = () => {
         </Card>
 
         {excelData.length > 0 && (
-          <div className="mb-6 flex justify-end">
+          <div className="mb-6 flex justify-center">
             <Button 
               onClick={exportExcel}
-              size="lg"
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+              size="sm"
+              className="flex items-center gap-1 bg-green-600 hover:bg-green-700 px-3 py-2 text-sm"
             >
-              <Download className="w-5 h-5" />
-              📥 Exportar Excel con Formato ({excelData.length} productos)
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">📥 Exportar Excel</span>
+              <span className="sm:hidden">📥 Exportar</span>
             </Button>
           </div>
         )}
