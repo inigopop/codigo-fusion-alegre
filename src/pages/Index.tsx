@@ -330,8 +330,10 @@ const Index = () => {
                 </div>
                 
                 <ExcelProcessor 
-                  onDataLoaded={handleDataLoaded}
-                  highlightedCells={highlightedCells}
+                  onDataProcessed={handleDataLoaded}
+                  existingData={excelData}
+                  originalHeader={originalHeader}
+                  originalStyles={originalStyles}
                 />
               </div>
             </div>
