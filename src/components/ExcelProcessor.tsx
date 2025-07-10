@@ -176,46 +176,51 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
   });
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="p-6">
-          <div
-            {...getRootProps()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
-            }`}
-          >
-            <input {...getInputProps()} />
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-            />
-            <div className="flex flex-col items-center space-y-4">
-              <Upload className="w-12 h-12 text-gray-400" />
-              <div>
-                <p className="text-lg font-medium text-gray-700">
-                  {isDragActive ? 'Suelta el archivo aquí...' : 'Arrastra el archivo Excel del inventario aquí'}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Estructura esperada: MATERIAL | PRODUCTO | UMB | STOCK
-                </p>
-              </div>
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={handleFileSelect}
-                type="button"
-              >
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Seleccionar Archivo
-              </Button>
-            </div>
+    <div className="space-y-6">
+      {/* Área principal de carga unificada */}
+      <div
+        {...getRootProps()}
+        className={`apple-card p-12 text-center transition-all duration-300 ${
+          isDragActive 
+            ? 'bg-primary/5 border-primary/20 scale-[1.02]' 
+            : 'hover:bg-muted/20 hover:border-muted/40'
+        }`}
+      >
+        <input {...getInputProps()} />
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+        />
+        
+        <div className="flex flex-col items-center space-y-6">
+          {/* Icono principal estilo Apple */}
+          <div className="w-20 h-20 bg-gradient-to-br from-primary/10 to-primary/20 rounded-3xl flex items-center justify-center">
+            <Upload className="w-10 h-10 text-primary" />
           </div>
-        </CardContent>
-      </Card>
+          
+          {/* Mensaje principal */}
+          <div className="space-y-2">
+            <h3 className="text-xl font-display font-medium text-foreground">
+              {isDragActive ? 'Suelta tu archivo aquí' : 'Arrastra tu archivo Excel'}
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              o haz clic para seleccionar desde tu dispositivo
+            </p>
+          </div>
+          
+          {/* Botón único - No botón separado aquí */}
+        </div>
+        
+        {/* Información técnica minimalista */}
+        <div className="mt-8 pt-6 border-t border-muted/20">
+          <p className="text-xs text-muted-foreground font-light">
+            Formatos compatibles: Excel (.xlsx, .xls) • Estructura: MATERIAL | PRODUCTO | UMB | STOCK
+          </p>
+        </div>
+      </div>
 
       {isProcessing && (
         <Card>

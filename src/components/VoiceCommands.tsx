@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Mic, MicOff, Volume2, Plus, List } from "lucide-react";
+import { Mic, MicOff, Volume2, Plus, List, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
@@ -994,53 +994,78 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </DialogContent>
       </Dialog>
 
-      {/* Ayuda de comandos ACTUALIZADA */}
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="font-medium mb-3">💡 Comandos disponibles:</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <strong>➕ Comando simple:</strong>
-              <ul className="ml-4 mt-1 space-y-1 text-gray-600">
-                <li>• "Vino Emina doce"</li>
-                <li>• "Cerveza seis"</li>
-                <li>• "Azúcar treinta y cuatro"</li>
-              </ul>
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div className="apple-card p-8">
+          <h3 className="text-lg font-display font-medium mb-6 flex items-center gap-3 text-foreground">
+            <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
+              <List className="w-4 h-4 text-primary" />
             </div>
-            <div>
-              <strong>🎯 Comandos múltiples (NUEVO):</strong>
-              <ul className="ml-4 mt-1 space-y-1 text-gray-600">
-                <li>• "Vino Beronia 12, Cerveza 6 y Vodka 8"</li>
-                <li>• "Ginebra Beefeater 5, Whisky 10"</li>
-                <li>• "Azúcar 15 también sal 8"</li>
-              </ul>
+            Comandos disponibles
+          </h3>
+          <div className="space-y-4">
+            <div className="bg-muted/30 p-4 rounded-2xl">
+              <p className="font-medium text-sm text-foreground">Comando simple:</p>
+              <p className="text-sm text-muted-foreground mt-1">"cerveza 5" o "pizza 3"</p>
+            </div>
+            <div className="bg-muted/30 p-4 rounded-2xl">
+              <p className="font-medium text-sm text-foreground">Comandos múltiples:</p>
+              <p className="text-sm text-muted-foreground mt-1">"cerveza 5 pizza 3 agua 2"</p>
+            </div>
+            <div className="bg-muted/30 p-4 rounded-2xl">
+              <p className="font-medium text-sm text-foreground">Con separadores:</p>
+              <p className="text-sm text-muted-foreground mt-1">"cerveza 5, pizza 3 y agua 2"</p>
             </div>
           </div>
-          
-          <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-            <h4 className="font-medium text-yellow-800 mb-2">🚀 ¡NUEVO! Inventariado rápido:</h4>
-            <p className="text-sm text-yellow-700">
-              Ahora puedes dictar varios productos a la vez separados por comas, "y" o "también". 
-              El sistema te guiará paso a paso para confirmar cada producto.
+        </div>
+
+        <div className="apple-card p-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <h3 className="text-lg font-display font-medium mb-6 flex items-center gap-3 text-foreground">
+            <div className="w-8 h-8 bg-primary/20 rounded-xl flex items-center justify-center">
+              <Plus className="w-4 h-4 text-primary" />
+            </div>
+            Inventariado rápido
+          </h3>
+          <div className="space-y-4">
+            <p className="text-sm text-foreground/90 leading-relaxed">
+              Actualiza múltiples productos en un solo comando para mayor eficiencia.
+            </p>
+            <div className="bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-primary/10">
+              <p className="text-sm font-medium text-foreground">Ejemplo:</p>
+              <p className="text-xs text-muted-foreground mt-2 font-mono">
+                "cerveza cinco, pizza tres y agua dos"
+              </p>
+            </div>
+            <p className="text-xs text-primary/80 flex items-center gap-2">
+              <span className="w-1 h-1 bg-primary rounded-full"></span>
+              Optimiza tu tiempo actualizando todo de una vez
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Información del sistema */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="p-4">
-          <h3 className="font-medium text-blue-700 mb-2">📊 Sistema de Stock Sumatorio:</h3>
-          <div className="text-sm text-blue-600 space-y-1">
-            <p>✅ Productos cargados: {excelData.length}</p>
-            <p>➕ Modo: SUMA cantidades al stock existente</p>
-            <p>🎤 Reconocimiento: {isListening ? 'Activo' : 'Inactivo'}</p>
-            <p>🔢 Reconoce números en palabras (doce, treinta y cuatro, etc.)</p>
-            <p>🔍 Búsqueda inteligente con sugerencias automáticas</p>
-            <p>🎯 <strong>NUEVO:</strong> Comandos múltiples para inventariado rápido</p>
+      <div className="apple-card p-6 mt-6 bg-background/50 backdrop-blur-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
+            <Package className="w-4 h-4 text-primary" />
           </div>
-        </CardContent>
-      </Card>
+          <h3 className="font-display font-medium text-foreground">Estado del sistema</h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+          <div className="text-center">
+            <p className="font-medium text-foreground">{excelData.length}</p>
+            <p className="text-muted-foreground text-xs">Productos</p>
+          </div>
+          <div className="text-center">
+            <p className="font-medium text-foreground">{isListening ? 'Activo' : 'Inactivo'}</p>
+            <p className="text-muted-foreground text-xs">Reconocimiento</p>
+          </div>
+          <div className="text-center col-span-2 md:col-span-1">
+            <p className="font-medium text-foreground">Suma</p>
+            <p className="text-muted-foreground text-xs">Modo stock</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

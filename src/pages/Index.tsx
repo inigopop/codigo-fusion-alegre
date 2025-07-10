@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import ExcelProcessor from "@/components/ExcelProcessor";
 import VoiceCommands from "@/components/VoiceCommands";
 import InventoryTable from "@/components/InventoryTable";
-import { FileText, Mic, Package, Download, Upload } from "lucide-react";
+import { FolderOpen, Mic, Package, Download, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as ExcelJS from 'exceljs';
 
@@ -270,42 +270,48 @@ const Index = () => {
           </p>
         </header>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - Siempre visibles */}
         <div className="flex justify-center mb-10">
           <div className="apple-card p-2 inline-flex">
             <button
               onClick={() => setActiveTab('import')}
-              className={`apple-button px-6 py-3 text-sm font-medium ${
+              className={`apple-button px-6 py-3 text-sm font-medium transition-all duration-300 ${
                 activeTab === 'import'
                   ? 'bg-primary text-primary-foreground shadow-apple-md'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  : excelData.length > 0 
+                    ? 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              <FileText className="w-4 h-4 mr-2" />
+              <FolderOpen className={`w-4 h-4 mr-2 ${activeTab !== 'import' && excelData.length > 0 ? 'opacity-50' : ''}`} />
               <span className="hidden sm:inline">Archivo</span>
               <span className="sm:hidden">📁</span>
             </button>
             <button
               onClick={() => setActiveTab('inventory')}
-              className={`apple-button px-6 py-3 text-sm font-medium ${
+              className={`apple-button px-6 py-3 text-sm font-medium transition-all duration-300 ${
                 activeTab === 'inventory'
                   ? 'bg-primary text-primary-foreground shadow-apple-md'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  : excelData.length === 0
+                    ? 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              <Package className="w-4 h-4 mr-2" />
+              <Package className={`w-4 h-4 mr-2 ${activeTab !== 'inventory' && excelData.length === 0 ? 'opacity-50' : ''}`} />
               <span className="hidden sm:inline">Inventario</span>
               <span className="sm:hidden">📦</span>
             </button>
             <button
               onClick={() => setActiveTab('voice')}
-              className={`apple-button px-6 py-3 text-sm font-medium ${
+              className={`apple-button px-6 py-3 text-sm font-medium transition-all duration-300 ${
                 activeTab === 'voice'
                   ? 'bg-primary text-primary-foreground shadow-apple-md'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  : excelData.length === 0
+                    ? 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              <Mic className="w-4 h-4 mr-2" />
+              <Mic className={`w-4 h-4 mr-2 ${activeTab !== 'voice' && excelData.length === 0 ? 'opacity-50' : ''}`} />
               <span className="hidden sm:inline">Control por Voz</span>
               <span className="sm:hidden">🎤</span>
             </button>
