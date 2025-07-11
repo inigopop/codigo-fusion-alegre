@@ -318,23 +318,27 @@ const Index = () => {
           </div>
         </div>
 
+        {/* Export Button - Movido arriba */}
+        {excelData.length > 0 && (
+          <div className="flex justify-center mb-8">
+            <Button 
+              onClick={exportExcel}
+              size="lg"
+              className="apple-button bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 shadow-apple-lg"
+            >
+              <Download className="w-5 h-5 mr-3" />
+              <span className="hidden sm:inline">Exportar Excel Actualizado</span>
+              <span className="sm:hidden">Exportar</span>
+              <span className="ml-2 text-xs opacity-75">({excelData.length} productos)</span>
+            </Button>
+          </div>
+        )}
+
         {/* Content Area */}
         <div className="space-y-8">
           {activeTab === 'import' && (
             <div className="animate-fade-in">
               <div className="apple-card p-8 max-w-2xl mx-auto">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-primary/10 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                    <Upload className="w-8 h-8 text-primary" />
-                  </div>
-                  <h2 className="text-2xl font-display font-light text-foreground mb-2">
-                    Cargar Inventario
-                  </h2>
-                  <p className="text-muted-foreground">
-                    Selecciona tu archivo Excel para comenzar
-                  </p>
-                </div>
-                
                 <ExcelProcessor 
                   onDataProcessed={handleDataLoaded}
                   existingData={excelData}
@@ -390,21 +394,6 @@ const Index = () => {
           )}
         </div>
 
-        {/* Export Button */}
-        {excelData.length > 0 && (
-          <div className="mt-12 flex justify-center">
-            <Button 
-              onClick={exportExcel}
-              size="lg"
-              className="apple-button bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 shadow-apple-lg"
-            >
-              <Download className="w-5 h-5 mr-3" />
-              <span className="hidden sm:inline">Exportar Excel Actualizado</span>
-              <span className="sm:hidden">Exportar</span>
-              <span className="ml-2 text-xs opacity-75">({excelData.length} productos)</span>
-            </Button>
-          </div>
-        )}
 
         {/* Footer */}
         <footer className="text-center mt-16 pb-8">

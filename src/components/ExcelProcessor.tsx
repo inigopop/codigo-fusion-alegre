@@ -177,16 +177,8 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
 
   return (
     <div className="space-y-6">
-      {/* Área principal de carga unificada */}
-      <div
-        {...getRootProps()}
-        className={`apple-card p-12 text-center transition-all duration-300 ${
-          isDragActive 
-            ? 'bg-primary/5 border-primary/20 scale-[1.02]' 
-            : 'hover:bg-muted/20 hover:border-muted/40'
-        }`}
-      >
-        <input {...getInputProps()} />
+      {/* Botón de carga principal */}
+      <div className="text-center">
         <input
           type="file"
           ref={fileInputRef}
@@ -195,27 +187,21 @@ const ExcelProcessor = ({ onDataProcessed, existingData }: ExcelProcessorProps) 
           className="hidden"
         />
         
-        <div className="flex flex-col items-center space-y-6">
-          {/* Icono principal estilo Apple */}
-          <div className="w-20 h-20 bg-gradient-to-br from-primary/10 to-primary/20 rounded-3xl flex items-center justify-center">
-            <Upload className="w-10 h-10 text-primary" />
+        <div className="space-y-4">
+          <div className="w-20 h-20 bg-gradient-to-br from-primary/10 to-primary/20 rounded-3xl mx-auto flex items-center justify-center">
+            <FileSpreadsheet className="w-10 h-10 text-primary" />
           </div>
           
-          {/* Mensaje principal */}
-          <div className="space-y-2">
-            <h3 className="text-xl font-display font-medium text-foreground">
-              {isDragActive ? 'Suelta tu archivo aquí' : 'Arrastra tu archivo Excel'}
-            </h3>
-            <p className="text-muted-foreground text-sm">
-              o haz clic para seleccionar desde tu dispositivo
-            </p>
-          </div>
+          <Button 
+            onClick={handleFileSelect}
+            disabled={isProcessing}
+            size="lg"
+            className="apple-button bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 shadow-apple-lg"
+          >
+            <Upload className="w-5 h-5 mr-3" />
+            Cargar Inventario
+          </Button>
           
-          {/* Botón único - No botón separado aquí */}
-        </div>
-        
-        {/* Información técnica minimalista */}
-        <div className="mt-8 pt-6 border-t border-muted/20">
           <p className="text-xs text-muted-foreground font-light">
             Formatos compatibles: Excel (.xlsx, .xls) • Estructura: MATERIAL | PRODUCTO | UMB | STOCK
           </p>
