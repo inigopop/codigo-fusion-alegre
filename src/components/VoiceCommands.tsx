@@ -994,54 +994,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </DialogContent>
       </Dialog>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <div className="apple-card p-8">
-          <h3 className="text-lg font-display font-medium mb-6 flex items-center gap-3 text-foreground">
-            <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
-              <List className="w-4 h-4 text-primary" />
-            </div>
-            Comandos disponibles
-          </h3>
-          <div className="space-y-4">
-            <div className="bg-muted/30 p-4 rounded-2xl">
-              <p className="font-medium text-sm text-foreground">Comando simple:</p>
-              <p className="text-sm text-muted-foreground mt-1">"cerveza 5" o "pizza 3"</p>
-            </div>
-            <div className="bg-muted/30 p-4 rounded-2xl">
-              <p className="font-medium text-sm text-foreground">Comandos múltiples:</p>
-              <p className="text-sm text-muted-foreground mt-1">"cerveza 5 pizza 3 agua 2"</p>
-            </div>
-            <div className="bg-muted/30 p-4 rounded-2xl">
-              <p className="font-medium text-sm text-foreground">Con separadores:</p>
-              <p className="text-sm text-muted-foreground mt-1">"cerveza 5, pizza 3 y agua 2"</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="apple-card p-8 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <h3 className="text-lg font-display font-medium mb-6 flex items-center gap-3 text-foreground">
-            <div className="w-8 h-8 bg-primary/20 rounded-xl flex items-center justify-center">
-              <Plus className="w-4 h-4 text-primary" />
-            </div>
-            Inventariado rápido
-          </h3>
-          <div className="space-y-4">
-            <p className="text-sm text-foreground/90 leading-relaxed">
-              Actualiza múltiples productos en un solo comando para mayor eficiencia.
-            </p>
-            <div className="bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-primary/10">
-              <p className="text-sm font-medium text-foreground">Ejemplo:</p>
-              <p className="text-xs text-muted-foreground mt-2 font-mono">
-                "cerveza cinco, pizza tres y agua dos"
-              </p>
-            </div>
-            <p className="text-xs text-primary/80 flex items-center gap-2">
-              <span className="w-1 h-1 bg-primary rounded-full"></span>
-              Optimiza tu tiempo actualizando todo de una vez
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Información del sistema */}
       <div className="apple-card p-6 mt-6 bg-background/50 backdrop-blur-sm">
