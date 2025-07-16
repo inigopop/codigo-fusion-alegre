@@ -306,7 +306,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           similarity: maxSimilarity
         };
       })
-      .filter(item => item.similarity > 30)
+      .filter(item => item.similarity > 50) // Aumentado de 30 a 50 para mejorar la calidad
       .sort((a, b) => b.similarity - a.similarity);
     
     console.log('📋 Sugerencias encontradas:', suggestions.length);
