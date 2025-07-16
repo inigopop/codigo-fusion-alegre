@@ -38,6 +38,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [showMultipleDialog, setShowMultipleDialog] = useState(false);
   const [pendingUpdates, setPendingUpdates] = useState<MultipleProductUpdate[]>([]);
   const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
+  const [skippedProducts, setSkippedProducts] = useState<{ productQuery: string; quantity: number }[]>([]);
   
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -447,29 +448,46 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       return;
     }
     
-    // Preparar todas las actualizaciones con sus sugerencias
-    const updates: MultipleProductUpdate[] = [];
+    // Separar productos con y sin sugerencias
+    const validUpdates: MultipleProductUpdate[] = [];
+    const skippedProducts: { productQuery: string; quantity: number }[] = [];
     
     commands.forEach(({ productQuery, quantity }, commandIndex) => {
       console.log(`🔍 [Comando ${commandIndex + 1}] Buscando: "${productQuery}" cantidad: ${quantity}`);
       const suggestions = findProductSuggestions(productQuery);
       console.log(`📋 [Comando ${commandIndex + 1}] Encontradas ${suggestions.length} sugerencias`);
       
-      updates.push({
-        productQuery,
-        quantity,
-        suggestions: suggestions.slice(0, 5)
-      });
+      if (suggestions.length > 0) {
+        validUpdates.push({
+          productQuery,
+          quantity,
+          suggestions: suggestions.slice(0, 5)
+        });
+      } else {
+        skippedProducts.push({ productQuery, quantity });
+        console.log(`⏭️ [Comando ${commandIndex + 1}] "${productQuery}" saltado por falta de coincidencias`);
+      }
     });
     
-    console.log('✅ PREPARADO: Total actualizaciones preparadas:', updates.length);
+    console.log('✅ PREPARADO: Válidos:', validUpdates.length, 'Saltados:', skippedProducts.length);
+    
+    // Mostrar información de productos saltados
+    if (skippedProducts.length > 0) {
+      const skippedList = skippedProducts.map(p => `"${p.productQuery}"`).join(', ');
+      toast({
+        title: "⚠️ Productos saltados",
+        description: `Se saltaron ${skippedProducts.length} productos sin coincidencias: ${skippedList}`,
+        variant: "destructive",
+      });
+    }
     
     // Configurar estado para mostrar diálogo múltiple
-    setPendingUpdates(updates);
+    setPendingUpdates(validUpdates);
+    setSkippedProducts(skippedProducts);
     setCurrentUpdateIndex(0);
     setShowMultipleDialog(true);
     
-    console.log('🎯 RESULTADO: Mostrando diálogo múltiple con', updates.length, 'productos');
+    console.log('🎯 RESULTADO: Mostrando diálogo múltiple con', validUpdates.length, 'productos válidos');
   };
 
   // Función para añadir stock a un producto
@@ -504,6 +522,22 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setSearchQuery('');
   };
 
+  // Función para reintentar productos saltados
+  const retrySkippedProducts = () => {
+    if (skippedProducts.length === 0) return;
+    
+    console.log('🔄 Reintentando productos saltados:', skippedProducts);
+    
+    // Procesar productos saltados uno por uno como comandos simples
+    skippedProducts.forEach(({ productQuery, quantity }) => {
+      console.log(`🔄 Reintentando: "${productQuery}" cantidad: ${quantity}`);
+      showProductSuggestions(productQuery, quantity);
+    });
+    
+    // Limpiar productos saltados
+    setSkippedProducts([]);
+  };
+
   // FUNCIÓN MEJORADA: handleMultipleSuggestionSelect
   const handleMultipleSuggestionSelect = (suggestion: ProductSuggestion) => {
     const currentUpdate = pendingUpdates[currentUpdateIndex];
@@ -526,15 +560,35 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       console.log(`➡️ Mostrando producto ${nextIndex + 1}: ${pendingUpdates[nextIndex].productQuery}`);
     } else {
       // Terminar proceso múltiple
-      console.log('🎉 TERMINADO: Todos los productos procesados');
+      console.log('🎉 TERMINADO: Todos los productos válidos procesados');
       setShowMultipleDialog(false);
       setPendingUpdates([]);
       setCurrentUpdateIndex(0);
       
-      toast({
-        title: "🎉 Actualización múltiple completada",
-        description: `Se actualizaron ${pendingUpdates.length} productos`,
-      });
+      const processedCount = pendingUpdates.length;
+      const skippedCount = skippedProducts.length;
+      
+      if (skippedCount > 0) {
+        toast({
+          title: "✅ Productos válidos procesados",
+          description: `Se actualizaron ${processedCount} productos. ${skippedCount} productos saltados disponibles para reintento.`,
+        });
+        
+        // Ofrecer reintento después de un pequeño delay
+        setTimeout(() => {
+          if (skippedProducts.length > 0) {
+            toast({
+              title: "🔄 ¿Reintentar productos saltados?",
+              description: `Quedan ${skippedProducts.length} productos por procesar. Usa comandos individuales para cada uno.`,
+            });
+          }
+        }, 2000);
+      } else {
+        toast({
+          title: "🎉 Actualización múltiple completada",
+          description: `Se actualizaron ${processedCount} productos`,
+        });
+      }
     }
   };
 
@@ -938,6 +992,24 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                 </div>
               </div>
               
+              {/* Productos saltados */}
+              {skippedProducts.length > 0 && (
+                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                  <h4 className="font-medium text-yellow-700 mb-2">⚠️ Productos saltados ({skippedProducts.length}):</h4>
+                  <div className="space-y-1 text-sm">
+                    {skippedProducts.map((skipped, index) => (
+                      <div key={index} className="flex justify-between text-yellow-600">
+                        <span>"{skipped.productQuery}"</span>
+                        <span>+{skipped.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-yellow-600 mt-2">
+                    Estos productos se procesarán individualmente después de completar los válidos.
+                  </p>
+                </div>
+              )}
+              
               {/* Sugerencias para el producto actual */}
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 <h4 className="font-medium">Selecciona el producto correcto:</h4>
@@ -977,6 +1049,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                 setShowMultipleDialog(false);
                 setPendingUpdates([]);
                 setCurrentUpdateIndex(0);
+                setSkippedProducts([]);
               }}
             >
               Cancelar Todo
