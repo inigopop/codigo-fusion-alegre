@@ -894,34 +894,34 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             <span className="font-medium">Escuchando...</span>
           </div>
         )}
-      </div>
 
-      {/* NUEVO: Input para Superwhisper */}
-      <div className="apple-card p-6 bg-background/50 backdrop-blur-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
-            <FileText className="w-4 h-4 text-primary" />
+        {/* NUEVO: Input para Superwhisper - Colocado justo después de los botones */}
+        <div className="mt-8 p-6 bg-card/60 backdrop-blur-xl border border-border/40 rounded-2xl shadow-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
+              <FileText className="w-4 h-4 text-primary" />
+            </div>
+            <h3 className="font-semibold text-foreground">Superwhisper - Pegar texto</h3>
           </div>
-          <h3 className="font-display font-medium text-foreground">Superwhisper</h3>
-        </div>
-        
-        <div className="space-y-3">
-          <Textarea
-            value={superwhisperText}
-            onChange={(e) => setSuperwhisperText(e.target.value)}
-            placeholder="Pega aquí el texto reconocido por Superwhisper"
-            className="w-full rounded-xl border border-gray-300 bg-white p-3 min-h-[100px] resize-none"
-            rows={4}
-          />
           
-          <Button
-            onClick={processSuperwhisperText}
-            disabled={!superwhisperText.trim() || isProcessing}
-            className="w-full mt-2 apple-button bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            Procesar texto
-          </Button>
+          <div className="space-y-3">
+            <Textarea
+              value={superwhisperText}
+              onChange={(e) => setSuperwhisperText(e.target.value)}
+              placeholder="Pega aquí el texto reconocido por Superwhisper (ej: 3 coca colas, 2 cervezas, 1 paquete arroz)"
+              className="w-full rounded-xl border border-border bg-background p-3 min-h-[100px] resize-none text-foreground placeholder:text-muted-foreground"
+              rows={4}
+            />
+            
+            <Button
+              onClick={processSuperwhisperText}
+              disabled={!superwhisperText.trim() || isProcessing}
+              className="w-full apple-button bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Procesar texto
+            </Button>
+          </div>
         </div>
       </div>
 
