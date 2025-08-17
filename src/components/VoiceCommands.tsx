@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Mic, MicOff, Volume2, Plus, List, Package } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Mic, MicOff, Volume2, Plus, List, Package, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface VoiceCommandsProps {
@@ -39,6 +40,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [pendingUpdates, setPendingUpdates] = useState<MultipleProductUpdate[]>([]);
   const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
   const [skippedProducts, setSkippedProducts] = useState<{ productQuery: string; quantity: number }[]>([]);
+  
+  // Nuevo estado para el input de Superwhisper
+  const [superwhisperText, setSuperwhisperText] = useState('');
   
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -666,6 +670,26 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setTimeout(() => setIsProcessing(false), 1000);
   }, [excelData, onUpdateStock, wordsToNumber, toast]);
 
+  // Nueva función para procesar texto de Superwhisper
+  const processSuperwhisperText = () => {
+    if (!superwhisperText.trim()) {
+      toast({
+        title: "❌ Texto vacío",
+        description: "Pega el texto reconocido por Superwhisper primero",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('📝 Procesando texto de Superwhisper:', superwhisperText);
+    
+    // Usar la misma lógica que el reconocimiento de voz
+    processVoiceCommand(superwhisperText.trim());
+    
+    // Limpiar el input después del procesamiento
+    setSuperwhisperText('');
+  };
+
   // Función para forzar la detención del reconocimiento
   const forceStopRecognition = useCallback(() => {
     console.log('🛑 Forzando detención completa');
@@ -872,6 +896,35 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         )}
       </div>
 
+      {/* NUEVO: Input para Superwhisper */}
+      <div className="apple-card p-6 bg-background/50 backdrop-blur-sm">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
+            <FileText className="w-4 h-4 text-primary" />
+          </div>
+          <h3 className="font-display font-medium text-foreground">Superwhisper</h3>
+        </div>
+        
+        <div className="space-y-3">
+          <Textarea
+            value={superwhisperText}
+            onChange={(e) => setSuperwhisperText(e.target.value)}
+            placeholder="Pega aquí el texto reconocido por Superwhisper"
+            className="w-full rounded-xl border border-gray-300 bg-white p-3 min-h-[100px] resize-none"
+            rows={4}
+          />
+          
+          <Button
+            onClick={processSuperwhisperText}
+            disabled={!superwhisperText.trim() || isProcessing}
+            className="w-full mt-2 apple-button bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Procesar texto
+          </Button>
+        </div>
+      </div>
+
       {/* Transcripción en tiempo real */}
       <Card>
         <CardContent className="p-4">
@@ -1066,7 +1119,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           </div>
         </DialogContent>
       </Dialog>
-
 
       {/* Información del sistema */}
       <div className="apple-card p-6 mt-6 bg-background/50 backdrop-blur-sm">
