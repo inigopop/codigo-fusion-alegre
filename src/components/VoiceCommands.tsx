@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -53,6 +53,31 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
+  // Extraer vocabulario de productos para Whisper
+  const productVocabulary = useMemo(() => {
+    if (excelData.length === 0) return [];
+    
+    const vocab = new Set<string>();
+    
+    excelData.forEach(item => {
+      // Añadir nombre completo del producto
+      if (item.Producto) {
+        vocab.add(item.Producto.toLowerCase().trim());
+        
+        // También añadir palabras individuales significativas (más de 3 caracteres)
+        const words = item.Producto.toLowerCase()
+          .replace(/[^\w\sáéíóúñü]/g, ' ')
+          .split(/\s+/)
+          .filter((w: string) => w.length > 3);
+        words.forEach((w: string) => vocab.add(w));
+      }
+    });
+    
+    const vocabArray = Array.from(vocab);
+    console.log('📚 Vocabulario generado para Whisper:', vocabArray.length, 'términos');
+    return vocabArray;
+  }, [excelData]);
+
   // Hook de Whisper
   const whisperRecognition = useWhisperRecognition({
     onTranscript: (text) => {
@@ -65,7 +90,8 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         title: "Error de reconocimiento",
         description: error,
       });
-    }
+    },
+    vocabulary: productVocabulary
   });
 
   // Función para normalizar texto (quitar acentos y convertir a minúsculas)
