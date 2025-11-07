@@ -4,8 +4,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Mic, MicOff, Volume2, Plus, List, Package, FileText } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Mic, MicOff, Volume2, Plus, List, Package, FileText, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useWhisperRecognition } from "@/hooks/useWhisperRecognition";
 
 interface VoiceCommandsProps {
   excelData: any[];
@@ -44,8 +47,26 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   // Nuevo estado para el input de Superwhisper
   const [superwhisperText, setSuperwhisperText] = useState('');
   
+  // Estado para elegir método de reconocimiento
+  const [useWhisper, setUseWhisper] = useState(false);
+  
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
+
+  // Hook de Whisper
+  const whisperRecognition = useWhisperRecognition({
+    onTranscript: (text) => {
+      setTranscript(text);
+      processVoiceCommand(text);
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error de reconocimiento",
+        description: error,
+      });
+    }
+  });
 
   // Función para normalizar texto (quitar acentos y convertir a minúsculas)
   const normalizeText = useCallback((text: string): string => {
@@ -834,21 +855,35 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       return;
     }
 
-    const recognition = setupRecognition();
-    if (recognition) {
-      recognitionRef.current = recognition;
-      try {
-        recognition.start();
-      } catch (error) {
-        console.error('Error iniciando reconocimiento:', error);
-        handleRecognitionError('start-error');
+    if (useWhisper) {
+      // Usar Whisper
+      whisperRecognition.startRecording();
+      setIsListening(true);
+      setTranscript('');
+      console.log('✅ Grabación iniciada con Whisper');
+    } else {
+      // Usar Web Speech API (método original)
+      const recognition = setupRecognition();
+      if (recognition) {
+        recognitionRef.current = recognition;
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error('Error iniciando reconocimiento:', error);
+          handleRecognitionError('start-error');
+        }
       }
     }
   };
 
   // Función para detener la escucha
   const stopListening = () => {
-    forceStopRecognition();
+    if (useWhisper) {
+      whisperRecognition.stopRecording();
+      setIsListening(false);
+    } else {
+      forceStopRecognition();
+    }
   };
 
   // Efecto para limpiar el reconocimiento al desmontar el componente
@@ -864,15 +899,47 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     <div className="space-y-6">
       {/* Control principal */}
       <div className="flex flex-col items-center space-y-4">
+        {/* Selector de método de reconocimiento */}
+        <Card className="w-full max-w-md bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <Label htmlFor="whisper-mode" className="text-base font-semibold">
+                    Whisper AI
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {useWhisper ? 'Reconocimiento mejorado con IA' : 'Reconocimiento estándar'}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="whisper-mode"
+                checked={useWhisper}
+                onCheckedChange={setUseWhisper}
+                disabled={isListening}
+              />
+            </div>
+            {useWhisper && whisperRecognition.isLoading && (
+              <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 animate-pulse">
+                ⏳ Cargando modelo (~40MB, solo primera vez)...
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex gap-4">
           <Button
             onClick={startListening}
-            disabled={isListening}
+            disabled={isListening || (useWhisper && whisperRecognition.isLoading)}
             size="lg"
             className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
           >
             <Mic className="w-5 h-5" />
-            Iniciar Escucha
+            {useWhisper ? 'Grabar con Whisper' : 'Iniciar Escucha'}
           </Button>
           
           <Button
@@ -883,7 +950,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             className="flex items-center gap-2"
           >
             <MicOff className="w-5 h-5" />
-            Detener Escucha
+            {useWhisper ? 'Detener Grabación' : 'Detener Escucha'}
           </Button>
         </div>
 
@@ -891,7 +958,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         {isListening && (
           <div className="flex items-center gap-2 text-yellow-600 animate-pulse">
             <Volume2 className="w-5 h-5" />
-            <span className="font-medium">Escuchando...</span>
+            <span className="font-medium">
+              {useWhisper ? 'Grabando con Whisper...' : 'Escuchando...'}
+            </span>
           </div>
         )}
 
