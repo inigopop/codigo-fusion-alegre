@@ -17,9 +17,16 @@ interface UseWhisperRecognitionProps {
   vocabulary?: string[]; // Lista de nombres de productos para mejorar precisión
 }
 
+// Detectar si estamos en móvil
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+};
+
 export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }: UseWhisperRecognitionProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [isMobile] = useState(isMobileDevice());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const transcriberRef = useRef<any>(null);
@@ -27,6 +34,12 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
   // Initialize Whisper model
   const initializeModel = useCallback(async () => {
     if (transcriberRef.current) return;
+    
+    // No cargar Whisper en móviles (demasiado pesado)
+    if (isMobile) {
+      onError('Whisper no está disponible en dispositivos móviles. Usa el reconocimiento estándar (desactiva Whisper).');
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -151,33 +164,48 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
     }
   }, [isRecording]);
 
-  // Post-procesar transcripción con fuzzy matching
+  // Post-procesar transcripción con fuzzy matching MEJORADO
   const correctTranscription = useCallback((text: string): string => {
     if (vocabulary.length === 0) return text;
 
     console.log('🔍 Corrección con vocabulario - Entrada:', text);
 
-    // Configurar Fuse.js para fuzzy matching
+    // Configurar Fuse.js para fuzzy matching MÁS PERMISIVO
     const fuse = new Fuse(vocabulary, {
       includeScore: true,
-      threshold: 0.4, // 0 = coincidencia perfecta, 1 = coincidencia débil
-      distance: 100,
+      threshold: 0.6, // Aumentado de 0.4 a 0.6 para ser más permisivo
+      distance: 150, // Aumentado de 100 a 150
       minMatchCharLength: 3,
+      ignoreLocation: true, // Ignorar posición de coincidencia
+      keys: ['$'], // Buscar en el string completo
     });
 
     // Dividir el texto en palabras
     const words = text.split(/\s+/);
     let correctedText = text;
 
-    // Buscar cada palabra en el vocabulario
+    // Primero buscar frases completas (2-4 palabras)
+    for (let phraseLen = 4; phraseLen >= 2; phraseLen--) {
+      for (let i = 0; i <= words.length - phraseLen; i++) {
+        const phrase = words.slice(i, i + phraseLen).join(' ');
+        const results = fuse.search(phrase);
+        
+        if (results.length > 0 && results[0].score && results[0].score < 0.5) {
+          const match = results[0].item;
+          console.log(`✅ Corrección frase: "${phrase}" → "${match}" (score: ${results[0].score})`);
+          correctedText = correctedText.replace(new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), match);
+        }
+      }
+    }
+    
+    // Luego buscar palabras individuales
     words.forEach(word => {
-      if (word.length < 3) return; // Ignorar palabras muy cortas
+      if (word.length < 3) return;
 
       const results = fuse.search(word);
-      if (results.length > 0 && results[0].score && results[0].score < 0.3) {
-        // Si hay una coincidencia fuerte, reemplazar
+      if (results.length > 0 && results[0].score && results[0].score < 0.45) {
         const match = results[0].item;
-        console.log(`✅ Corrección: "${word}" → "${match}" (score: ${results[0].score})`);
+        console.log(`✅ Corrección palabra: "${word}" → "${match}" (score: ${results[0].score})`);
         correctedText = correctedText.replace(new RegExp(`\\b${word}\\b`, 'gi'), match);
       }
     });
@@ -259,6 +287,7 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
     isRecording,
     startRecording,
     stopRecording,
-    initializeModel
+    initializeModel,
+    isMobile
   };
 };

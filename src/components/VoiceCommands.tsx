@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Mic, MicOff, Volume2, Plus, List, Package, FileText, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWhisperRecognition } from "@/hooks/useWhisperRecognition";
+import { useProductAliases } from "@/hooks/useProductAliases";
 
 interface VoiceCommandsProps {
   excelData: any[];
@@ -53,30 +54,15 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
-  // Extraer vocabulario de productos para Whisper
+  // Sistema de aliases para productos
+  const { aliases, addAlias, findProductByText, getExpandedVocabulary } = useProductAliases(excelData);
+
+  // Vocabulario expandido para Whisper (incluye aliases)
   const productVocabulary = useMemo(() => {
-    if (excelData.length === 0) return [];
-    
-    const vocab = new Set<string>();
-    
-    excelData.forEach(item => {
-      // Añadir nombre completo del producto
-      if (item.Producto) {
-        vocab.add(item.Producto.toLowerCase().trim());
-        
-        // También añadir palabras individuales significativas (más de 3 caracteres)
-        const words = item.Producto.toLowerCase()
-          .replace(/[^\w\sáéíóúñü]/g, ' ')
-          .split(/\s+/)
-          .filter((w: string) => w.length > 3);
-        words.forEach((w: string) => vocab.add(w));
-      }
-    });
-    
-    const vocabArray = Array.from(vocab);
-    console.log('📚 Vocabulario generado para Whisper:', vocabArray.length, 'términos');
-    return vocabArray;
-  }, [excelData]);
+    const vocab = getExpandedVocabulary();
+    console.log('📚 Vocabulario expandido con aliases:', vocab.length, 'términos');
+    return vocab;
+  }, [getExpandedVocabulary]);
 
   // Hook de Whisper
   const whisperRecognition = useWhisperRecognition({
@@ -93,6 +79,18 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     },
     vocabulary: productVocabulary
   });
+  
+  // Advertir si Whisper está activado en móvil
+  useEffect(() => {
+    if (useWhisper && whisperRecognition.isMobile) {
+      toast({
+        title: "⚠️ Whisper en móvil",
+        description: "Whisper no funciona bien en móviles. Se recomienda usar el reconocimiento estándar.",
+        variant: "destructive",
+      });
+      setUseWhisper(false);
+    }
+  }, [useWhisper, whisperRecognition.isMobile]);
 
   // Función para normalizar texto (quitar acentos y convertir a minúsculas)
   const normalizeText = useCallback((text: string): string => {
@@ -338,10 +336,22 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return finalScore;
   };
 
-  // Función para buscar sugerencias de productos
+  // Función MEJORADA para buscar sugerencias usando aliases
   const findProductSuggestions = (query: string): ProductSuggestion[] => {
     console.log('🔍 Buscando sugerencias para:', query);
     
+    // Primero buscar con aliases (búsqueda exacta o parcial)
+    const aliasMatch = findProductByText(query);
+    if (aliasMatch) {
+      console.log('✅ Coincidencia por alias:', aliasMatch);
+      return [{
+        product: excelData[aliasMatch.index],
+        index: aliasMatch.index,
+        similarity: aliasMatch.matchType === 'exact' ? 100 : 85
+      }];
+    }
+    
+    // Si no hay coincidencia por alias, usar fuzzy matching
     const suggestions = excelData
       .map((product, index) => {
         const productName = (product.Producto || '').toString();
@@ -349,7 +359,15 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         
         const nameSimilarity = calculateSimilarity(query, productName);
         const codeSimilarity = calculateSimilarity(query, materialCode);
-        const maxSimilarity = Math.max(nameSimilarity, codeSimilarity);
+        
+        // También buscar en aliases del producto
+        const productAliases = aliases[index]?.aliases || [];
+        const aliasSimilarities = productAliases.map(alias => 
+          calculateSimilarity(query, alias)
+        );
+        const maxAliasSimilarity = Math.max(0, ...aliasSimilarities);
+        
+        const maxSimilarity = Math.max(nameSimilarity, codeSimilarity, maxAliasSimilarity);
         
         return {
           product,
@@ -357,14 +375,14 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           similarity: maxSimilarity
         };
       })
-      .filter(item => item.similarity > 50) // Aumentado de 30 a 50 para mejorar la calidad
+      .filter(item => item.similarity > 40) // Bajado de 50 a 40 para ser más permisivo
       .sort((a, b) => b.similarity - a.similarity);
     
     console.log('📋 Sugerencias encontradas:', suggestions.length);
     return suggestions;
   };
 
-  // FUNCIÓN ARREGLADA: showProductSuggestions
+  // FUNCIÓN MEJORADA: showProductSuggestions con alternativas
   const showProductSuggestions = (productQuery: string, quantity: number) => {
     console.log('🔍 Mostrando sugerencias para:', productQuery, 'cantidad:', quantity);
     
@@ -373,11 +391,28 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     if (suggestions.length === 0) {
       toast({
         title: "❌ Producto no encontrado",
-        description: `No se encontró "${productQuery}"`,
+        description: `No se encontró "${productQuery}". Intenta con otro nombre o código.`,
         variant: "destructive",
       });
       return;
     }
+    
+    // Si hay coincidencia exacta (> 85%), actualizar directamente
+    if (suggestions.length > 0 && suggestions[0].similarity >= 85) {
+      console.log('✅ Coincidencia fuerte detectada, actualizando directamente');
+      onUpdateStock(suggestions[0].index, quantity);
+      toast({
+        title: "✅ Stock actualizado",
+        description: `${suggestions[0].product.Producto}: +${quantity}`,
+      });
+      return;
+    }
+    
+    // Si hay varias alternativas, mostrar diálogo
+    toast({
+      title: "🔍 Producto similar encontrado",
+      description: `Se encontraron ${suggestions.length} productos similares. Elige el correcto.`,
+    });
     
     setSuggestions(suggestions.slice(0, 5));
     setPendingQuantity(quantity);
