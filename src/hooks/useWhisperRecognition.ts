@@ -1,6 +1,15 @@
 import { useState, useRef, useCallback } from 'react';
-import { pipeline } from '@huggingface/transformers';
+import { pipeline, type PipelineType } from '@huggingface/transformers';
 import Fuse from 'fuse.js';
+
+// Extender Navigator para incluir gpu (WebGPU)
+declare global {
+  interface Navigator {
+    gpu?: {
+      requestAdapter(): Promise<any>;
+    };
+  }
+}
 
 interface UseWhisperRecognitionProps {
   onTranscript: (text: string) => void;
@@ -23,21 +32,40 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
       setIsLoading(true);
       console.log('🎯 Inicializando modelo Whisper...');
       
+      // Detectar si WebGPU está disponible
+      let device: 'wasm' | 'webgpu' = 'wasm'; // Default fallback
+      let dtype: 'q8' | 'fp32' = 'q8'; // Quantized para mejor rendimiento
+      
+      if (navigator.gpu) {
+        try {
+          const adapter = await navigator.gpu.requestAdapter();
+          if (adapter) {
+            console.log('✅ WebGPU disponible, usando aceleración GPU');
+            device = 'webgpu';
+            dtype = 'fp32';
+          }
+        } catch (gpuError) {
+          console.warn('⚠️ WebGPU no disponible, usando WASM:', gpuError);
+        }
+      } else {
+        console.log('📱 WebGPU no soportado, usando WASM (normal en móviles)');
+      }
+      
       transcriberRef.current = await pipeline(
         'automatic-speech-recognition',
-        'Xenova/whisper-small',
+        'Xenova/whisper-tiny', // Usar tiny en lugar de small para mejor compatibilidad móvil
         { 
-          device: 'webgpu',
-          dtype: 'fp32'
+          device,
+          dtype
         }
       );
       
-      console.log('✅ Modelo Whisper cargado');
+      console.log(`✅ Modelo Whisper cargado (${device}/${dtype})`);
       setIsLoading(false);
     } catch (error) {
       console.error('❌ Error cargando modelo:', error);
       setIsLoading(false);
-      onError('Error al cargar el modelo de reconocimiento de voz');
+      onError('Error al cargar el modelo. Prueba recargando la página o usando el reconocimiento estándar.');
     }
   }, [onError]);
 
@@ -49,9 +77,24 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
         await initializeModel();
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Verificar que el modelo se cargó correctamente
+      if (!transcriberRef.current) {
+        onError('El modelo no se pudo cargar. Intenta usar el reconocimiento estándar.');
+        return;
+      }
+
+      // Verificar permisos de micrófono
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000
+        } 
+      });
       
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -62,19 +105,40 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        await transcribeAudio(audioBlob);
-        
-        // Stop all tracks
+        try {
+          const audioBlob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
+          if (audioBlob.size > 0) {
+            await transcribeAudio(audioBlob);
+          } else {
+            onError('No se grabó audio. Intenta hablar más cerca del micrófono.');
+          }
+        } catch (error) {
+          console.error('❌ Error al procesar audio:', error);
+          onError('Error al procesar el audio grabado');
+        } finally {
+          // Stop all tracks
+          stream.getTracks().forEach(track => track.stop());
+        }
+      };
+
+      mediaRecorder.onerror = (event) => {
+        console.error('❌ Error en MediaRecorder:', event);
+        onError('Error durante la grabación');
         stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       console.log('🎤 Grabación iniciada con Whisper');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error al iniciar grabación:', error);
-      onError('Error al acceder al micrófono');
+      if (error.name === 'NotAllowedError') {
+        onError('Permiso de micrófono denegado. Permite el acceso al micrófono en la configuración del navegador.');
+      } else if (error.name === 'NotFoundError') {
+        onError('No se encontró micrófono. Conecta un micrófono e intenta de nuevo.');
+      } else {
+        onError('Error al acceder al micrófono: ' + error.message);
+      }
     }
   }, [initializeModel, onError]);
 
@@ -131,34 +195,59 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
 
     try {
       setIsLoading(true);
-      console.log('🔄 Transcribiendo audio...');
+      console.log('🔄 Transcribiendo audio...', audioBlob.size, 'bytes');
+
+      // Verificar que hay audio
+      if (audioBlob.size < 100) {
+        onError('Audio muy corto o vacío. Intenta grabar de nuevo hablando claramente.');
+        setIsLoading(false);
+        return;
+      }
 
       // Convert blob to array buffer
       const arrayBuffer = await audioBlob.arrayBuffer();
       
       // Crear prompt inicial con vocabulario para guiar a Whisper
       const initialPrompt = vocabulary.length > 0
-        ? `Vocabulario: ${vocabulary.slice(0, 50).join(', ')}.` // Límite de 50 productos
+        ? `Vocabulario de productos: ${vocabulary.slice(0, 30).join(', ')}.` // Reducido a 30 para evitar prompts muy largos
         : undefined;
 
-      // Transcribe
-      const result = await transcriberRef.current(arrayBuffer, {
+      console.log('🎯 Iniciando transcripción con Whisper...');
+
+      // Transcribe with timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Transcripción timeout')), 30000) // 30 segundos timeout
+      );
+
+      const transcribePromise = transcriberRef.current(arrayBuffer, {
         language: 'spanish',
         task: 'transcribe',
         ...(initialPrompt && { initial_prompt: initialPrompt })
       });
 
+      const result = await Promise.race([transcribePromise, timeoutPromise]);
+
       console.log('📝 Transcripción original:', result.text);
+      
+      if (!result.text || result.text.trim().length === 0) {
+        onError('No se detectó voz en la grabación. Intenta hablar más claro y cerca del micrófono.');
+        setIsLoading(false);
+        return;
+      }
       
       // Corregir transcripción con vocabulario
       const correctedText = correctTranscription(result.text);
       
       onTranscript(correctedText);
       setIsLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error en transcripción:', error);
       setIsLoading(false);
-      onError('Error al transcribir el audio');
+      if (error.message === 'Transcripción timeout') {
+        onError('La transcripción está tardando mucho. Prueba con un audio más corto o usa el reconocimiento estándar.');
+      } else {
+        onError('Error al transcribir el audio. Intenta de nuevo o usa el reconocimiento estándar.');
+      }
     }
   }, [onTranscript, onError, vocabulary, correctTranscription]);
 

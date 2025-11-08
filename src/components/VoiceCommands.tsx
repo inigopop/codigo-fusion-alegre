@@ -954,6 +954,11 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                 ⏳ Cargando modelo (~40MB, solo primera vez)...
               </p>
             )}
+            {useWhisper && !whisperRecognition.isLoading && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                ✅ Modelo cargado y listo
+              </p>
+            )}
           </CardContent>
         </Card>
 
