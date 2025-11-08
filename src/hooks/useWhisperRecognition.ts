@@ -204,8 +204,8 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
         return;
       }
 
-      // Convert blob to array buffer
-      const arrayBuffer = await audioBlob.arrayBuffer();
+      // Convert blob to URL for processing
+      const audioUrl = URL.createObjectURL(audioBlob);
       
       // Crear prompt inicial con vocabulario para guiar a Whisper
       const initialPrompt = vocabulary.length > 0
@@ -219,13 +219,16 @@ export const useWhisperRecognition = ({ onTranscript, onError, vocabulary = [] }
         setTimeout(() => reject(new Error('Transcripción timeout')), 30000) // 30 segundos timeout
       );
 
-      const transcribePromise = transcriberRef.current(arrayBuffer, {
+      const transcribePromise = transcriberRef.current(audioUrl, {
         language: 'spanish',
         task: 'transcribe',
         ...(initialPrompt && { initial_prompt: initialPrompt })
       });
 
       const result = await Promise.race([transcribePromise, timeoutPromise]);
+      
+      // Cleanup URL object
+      URL.revokeObjectURL(audioUrl);
 
       console.log('📝 Transcripción original:', result.text);
       
