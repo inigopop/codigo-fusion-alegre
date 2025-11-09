@@ -1,14 +1,10 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Mic, MicOff, Volume2, Plus, List, Package, FileText, Sparkles } from "lucide-react";
+import { Mic, MicOff, Volume2, Plus, List, Package, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useWhisperRecognition } from "@/hooks/useWhisperRecognition";
 import { useProductAliases } from "@/hooks/useProductAliases";
 
 interface VoiceCommandsProps {
@@ -45,52 +41,14 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
   const [skippedProducts, setSkippedProducts] = useState<{ productQuery: string; quantity: number }[]>([]);
   
-  // Nuevo estado para el input de Superwhisper
-  const [superwhisperText, setSuperwhisperText] = useState('');
-  
-  // Estado para elegir método de reconocimiento
-  const [useWhisper, setUseWhisper] = useState(false);
+  // Nuevo estado para el input de texto manual
+  const [manualText, setManualText] = useState('');
   
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
 
   // Sistema de aliases para productos
-  const { aliases, addAlias, findProductByText, getExpandedVocabulary } = useProductAliases(excelData);
-
-  // Vocabulario expandido para Whisper (incluye aliases)
-  const productVocabulary = useMemo(() => {
-    const vocab = getExpandedVocabulary();
-    console.log('📚 Vocabulario expandido con aliases:', vocab.length, 'términos');
-    return vocab;
-  }, [getExpandedVocabulary]);
-
-  // Hook de Whisper
-  const whisperRecognition = useWhisperRecognition({
-    onTranscript: (text) => {
-      setTranscript(text);
-      processVoiceCommand(text);
-    },
-    onError: (error) => {
-      toast({
-        variant: "destructive",
-        title: "Error de reconocimiento",
-        description: error,
-      });
-    },
-    vocabulary: productVocabulary
-  });
-  
-  // Advertir si Whisper está activado en móvil
-  useEffect(() => {
-    if (useWhisper && whisperRecognition.isMobile) {
-      toast({
-        title: "⚠️ Whisper en móvil",
-        description: "Whisper no funciona bien en móviles. Se recomienda usar el reconocimiento estándar.",
-        variant: "destructive",
-      });
-      setUseWhisper(false);
-    }
-  }, [useWhisper, whisperRecognition.isMobile]);
+  const { aliases, findProductByText } = useProductAliases(excelData);
 
   // Función para normalizar texto (quitar acentos y convertir a minúsculas)
   const normalizeText = useCallback((text: string): string => {
@@ -752,24 +710,20 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setTimeout(() => setIsProcessing(false), 1000);
   }, [excelData, onUpdateStock, wordsToNumber, toast]);
 
-  // Nueva función para procesar texto de Superwhisper
-  const processSuperwhisperText = () => {
-    if (!superwhisperText.trim()) {
+  // Función para procesar texto manual
+  const processManualText = () => {
+    if (!manualText.trim()) {
       toast({
         title: "❌ Texto vacío",
-        description: "Pega el texto reconocido por Superwhisper primero",
+        description: "Escribe o pega el comando primero",
         variant: "destructive",
       });
       return;
     }
 
-    console.log('📝 Procesando texto de Superwhisper:', superwhisperText);
-    
-    // Usar la misma lógica que el reconocimiento de voz
-    processVoiceCommand(superwhisperText.trim());
-    
-    // Limpiar el input después del procesamiento
-    setSuperwhisperText('');
+    console.log('📝 Procesando texto manual:', manualText);
+    processVoiceCommand(manualText.trim());
+    setManualText('');
   };
 
   // Función para forzar la detención del reconocimiento
@@ -916,38 +870,46 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       return;
     }
 
-    if (useWhisper) {
-      // Usar Whisper
-      whisperRecognition.startRecording();
-      setIsListening(true);
-      setTranscript('');
-      console.log('✅ Grabación iniciada con Whisper');
-    } else {
-      // Usar Web Speech API (método original)
-      const recognition = setupRecognition();
-      if (recognition) {
-        recognitionRef.current = recognition;
-        try {
-          recognition.start();
-        } catch (error) {
-          console.error('Error iniciando reconocimiento:', error);
-          handleRecognitionError('start-error');
-        }
+    const recognition = setupRecognition();
+    if (recognition) {
+      recognitionRef.current = recognition;
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error('Error iniciando reconocimiento:', error);
+        handleRecognitionError('start-error');
       }
     }
   };
 
   // Función para detener la escucha
   const stopListening = () => {
-    if (useWhisper) {
-      whisperRecognition.stopRecording();
-      setIsListening(false);
-    } else {
-      forceStopRecognition();
-    }
+    forceStopRecognition();
   };
 
-  // Efecto para limpiar el reconocimiento al desmontar el componente
+  // Atajos de teclado para selección rápida
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (showSuggestionsDialog && suggestions.length > 0) {
+        const num = parseInt(e.key);
+        if (num >= 1 && num <= Math.min(5, suggestions.length)) {
+          e.preventDefault();
+          handleSuggestionSelect(suggestions[num - 1]);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSuggestionSelect(suggestions[0]);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowSuggestionsDialog(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showSuggestionsDialog, suggestions]);
+
+  // Efecto para limpiar el reconocimiento al desmontar
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
@@ -960,52 +922,15 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     <div className="space-y-6">
       {/* Control principal */}
       <div className="flex flex-col items-center space-y-4">
-        {/* Selector de método de reconocimiento */}
-        <Card className="w-full max-w-md bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <Label htmlFor="whisper-mode" className="text-base font-semibold">
-                    Whisper AI
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {useWhisper ? 'Reconocimiento mejorado con IA' : 'Reconocimiento estándar'}
-                  </p>
-                </div>
-              </div>
-              <Switch
-                id="whisper-mode"
-                checked={useWhisper}
-                onCheckedChange={setUseWhisper}
-                disabled={isListening}
-              />
-            </div>
-            {useWhisper && whisperRecognition.isLoading && (
-              <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 animate-pulse">
-                ⏳ Cargando modelo (~40MB, solo primera vez)...
-              </p>
-            )}
-            {useWhisper && !whisperRecognition.isLoading && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                ✅ Modelo cargado y listo
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
         <div className="flex gap-4">
           <Button
             onClick={startListening}
-            disabled={isListening || (useWhisper && whisperRecognition.isLoading)}
+            disabled={isListening}
             size="lg"
-            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg"
           >
             <Mic className="w-5 h-5" />
-            {useWhisper ? 'Grabar con Whisper' : 'Iniciar Escucha'}
+            Iniciar Dictado
           </Button>
           
           <Button
@@ -1013,48 +938,52 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             disabled={!isListening}
             variant="destructive"
             size="lg"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 shadow-lg"
           >
             <MicOff className="w-5 h-5" />
-            {useWhisper ? 'Detener Grabación' : 'Detener Escucha'}
+            Detener
           </Button>
         </div>
 
         {/* Estado visual */}
         {isListening && (
-          <div className="flex items-center gap-2 text-yellow-600 animate-pulse">
+          <div className="flex items-center gap-2 text-primary animate-pulse">
             <Volume2 className="w-5 h-5" />
-            <span className="font-medium">
-              {useWhisper ? 'Grabando con Whisper...' : 'Escuchando...'}
-            </span>
+            <span className="font-medium text-lg">Escuchando...</span>
           </div>
         )}
 
-        {/* NUEVO: Input para Superwhisper - Colocado justo después de los botones */}
-        <div className="mt-8 p-6 bg-card/60 backdrop-blur-xl border border-border/40 rounded-2xl shadow-lg">
+        {/* Input para texto manual */}
+        <div className="w-full max-w-2xl mt-8 p-6 bg-card/60 backdrop-blur-xl border border-border/40 rounded-2xl shadow-lg">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
               <FileText className="w-4 h-4 text-primary" />
             </div>
-            <h3 className="font-semibold text-foreground">Superwhisper - Pegar texto</h3>
+            <h3 className="font-semibold text-foreground">Escribir comando</h3>
           </div>
           
           <div className="space-y-3">
             <Textarea
-              value={superwhisperText}
-              onChange={(e) => setSuperwhisperText(e.target.value)}
-              placeholder="Pega aquí el texto reconocido por Superwhisper (ej: 3 coca colas, 2 cervezas, 1 paquete arroz)"
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  processManualText();
+                }
+              }}
+              placeholder="Escribe o pega tu comando aquí (ej: coca cola 12, ron 24)&#10;Presiona Enter para procesar"
               className="w-full rounded-xl border border-border bg-background p-3 min-h-[100px] resize-none text-foreground placeholder:text-muted-foreground"
               rows={4}
             />
             
             <Button
-              onClick={processSuperwhisperText}
-              disabled={!superwhisperText.trim() || isProcessing}
-              className="w-full apple-button bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={processManualText}
+              disabled={!manualText.trim() || isProcessing}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
             >
               <FileText className="w-4 h-4 mr-2" />
-              Procesar texto
+              Procesar comando
             </Button>
           </div>
         </div>
@@ -1077,51 +1006,73 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </CardContent>
       </Card>
 
-      {/* Diálogo para comandos simples (existente) */}
+      {/* Diálogo de corrección rápida */}
       <Dialog open={showSuggestionsDialog} onOpenChange={setShowSuggestionsDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>🔍 Selecciona el producto correcto</DialogTitle>
-            <DialogDescription>
-              Encontramos {suggestions.length} productos similares a "{searchQuery}". 
-              Selecciona el correcto para añadir {pendingQuantity} unidades.
+            <DialogTitle className="text-2xl">⚡ Corrección rápida</DialogTitle>
+            <DialogDescription className="text-base">
+              Buscaste: <span className="font-semibold text-foreground">"{searchQuery}"</span>
+              <br />
+              Cantidad a añadir: <span className="font-semibold text-green-600">+{pendingQuantity} unidades</span>
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                💡 Usa las teclas 1-5 para seleccionar, Enter para el primero, ESC para cancelar
+              </span>
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {suggestions.map((suggestion, index) => (
-              <div
-                key={index}
-                className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors hover:border-green-400"
-                onClick={() => handleSuggestionSelect(suggestion)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-lg">{suggestion.product.Producto}</p>
-                    <p className="text-sm text-gray-600">
-                      Código: {suggestion.product.Material || suggestion.product.Codigo} | 
-                      Stock actual: {suggestion.product.Stock || 0} {suggestion.product.UMB}
-                    </p>
-                    <p className="text-xs text-green-600">
-                      Similitud: {Math.round(suggestion.similarity)}%
-                    </p>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {suggestions.map((suggestion, index) => {
+              const newStock = (Number(suggestion.product.Stock) || 0) + pendingQuantity;
+              return (
+                <Button
+                  key={index}
+                  onClick={() => handleSuggestionSelect(suggestion)}
+                  variant="outline"
+                  className="w-full h-auto p-5 text-left hover:bg-primary/10 hover:border-primary transition-all group"
+                >
+                  <div className="flex items-center gap-4 w-full">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      {index + 1}
+                    </div>
+                    
+                    <div className="flex-1">
+                      <p className="font-semibold text-lg mb-1 text-foreground">
+                        {suggestion.product.Producto}
+                      </p>
+                      <div className="flex gap-4 text-sm text-muted-foreground">
+                        <span>Código: {suggestion.product.Material || suggestion.product.Codigo}</span>
+                        <span>Stock: {suggestion.product.Stock || 0} → <span className="text-green-600 font-semibold">{newStock}</span> {suggestion.product.UMB}</span>
+                      </div>
+                      <div className="mt-1">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          suggestion.similarity >= 85 ? 'bg-green-100 text-green-700' :
+                          suggestion.similarity >= 70 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-orange-100 text-orange-700'
+                        }`}>
+                          {Math.round(suggestion.similarity)}% coincidencia
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-green-600 bg-green-50 px-4 py-3 rounded-lg">
+                      <Plus className="w-6 h-6" />
+                      <span className="font-bold text-2xl">{pendingQuantity}</span>
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded">
-                    <Plus className="w-5 h-5" />
-                    <span className="font-bold text-lg">{pendingQuantity}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+                </Button>
+              );
+            })}
           </div>
           
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button 
               variant="outline" 
               onClick={() => setShowSuggestionsDialog(false)}
+              className="shadow-sm"
             >
-              Cancelar
+              Cancelar (ESC)
             </Button>
           </div>
         </DialogContent>
