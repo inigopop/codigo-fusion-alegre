@@ -294,9 +294,39 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return finalScore;
   };
 
-  // Función MEJORADA para buscar sugerencias usando aliases
+  // Función auxiliar para calcular distancia de Levenshtein (similitud de edición)
+  const levenshteinDistance = (str1: string, str2: string): number => {
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+
+    return matrix[str2.length][str1.length];
+  };
+
+  // Función SUPER MEJORADA para buscar sugerencias con múltiples estrategias
   const findProductSuggestions = (query: string): ProductSuggestion[] => {
     console.log('🔍 Buscando sugerencias para:', query);
+    const normalizedQuery = normalizeText(query);
     
     // Primero buscar con aliases (búsqueda exacta o parcial)
     const aliasMatch = findProductByText(query);
@@ -309,35 +339,131 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       }];
     }
     
-    // Si no hay coincidencia por alias, usar fuzzy matching
-    const suggestions = excelData
-      .map((product, index) => {
-        const productName = (product.Producto || '').toString();
-        const materialCode = (product.Material || product.Codigo || '').toString();
-        
-        const nameSimilarity = calculateSimilarity(query, productName);
-        const codeSimilarity = calculateSimilarity(query, materialCode);
-        
-        // También buscar en aliases del producto
-        const productAliases = aliases[index]?.aliases || [];
-        const aliasSimilarities = productAliases.map(alias => 
-          calculateSimilarity(query, alias)
-        );
-        const maxAliasSimilarity = Math.max(0, ...aliasSimilarities);
-        
-        const maxSimilarity = Math.max(nameSimilarity, codeSimilarity, maxAliasSimilarity);
-        
-        return {
-          product,
-          index,
-          similarity: maxSimilarity
-        };
-      })
-      .filter(item => item.similarity > 40) // Bajado de 50 a 40 para ser más permisivo
-      .sort((a, b) => b.similarity - a.similarity);
+    // Mapa para acumular los mejores matches de cada producto
+    const productScores = new Map<number, { product: any; index: number; similarity: number; reasons: string[] }>();
     
-    console.log('📋 Sugerencias encontradas:', suggestions.length);
-    return suggestions;
+    // ESTRATEGIA 1: Búsqueda por palabras clave individuales con Levenshtein
+    const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 2);
+    
+    excelData.forEach((product, index) => {
+      const productName = normalizeText(product.Producto || '');
+      const productWords = productName.split(/\s+/).filter(w => w.length > 2);
+      
+      let matchedWords = 0;
+      let totalWordScore = 0;
+      const matchReasons: string[] = [];
+
+      queryWords.forEach(qWord => {
+        let bestWordMatch = 0;
+        
+        productWords.forEach(pWord => {
+          // Coincidencia exacta
+          if (qWord === pWord) {
+            bestWordMatch = Math.max(bestWordMatch, 100);
+            matchReasons.push(`✓ "${qWord}" exacto`);
+          }
+          // Contiene
+          else if (pWord.includes(qWord) || qWord.includes(pWord)) {
+            bestWordMatch = Math.max(bestWordMatch, 85);
+            matchReasons.push(`≈ "${qWord}" en "${pWord}"`);
+          }
+          // Levenshtein (permite errores de transcripción)
+          else {
+            const distance = levenshteinDistance(qWord, pWord);
+            const maxLen = Math.max(qWord.length, pWord.length);
+            
+            // Permitir hasta 2 caracteres de diferencia para palabras largas
+            if (distance <= 2 && maxLen >= 4) {
+              const similarity = ((maxLen - distance) / maxLen) * 75;
+              bestWordMatch = Math.max(bestWordMatch, similarity);
+              matchReasons.push(`~ "${qWord}" ≈ "${pWord}" (dist: ${distance})`);
+            }
+          }
+        });
+        
+        if (bestWordMatch > 50) {
+          matchedWords++;
+          totalWordScore += bestWordMatch;
+        }
+      });
+
+      if (matchedWords > 0) {
+        const wordMatchRatio = matchedWords / queryWords.length;
+        const avgScore = totalWordScore / matchedWords;
+        const finalScore = avgScore * wordMatchRatio;
+        
+        const existing = productScores.get(index);
+        if (!existing || existing.similarity < finalScore) {
+          productScores.set(index, {
+            product,
+            index,
+            similarity: finalScore,
+            reasons: matchReasons.slice(0, 3)
+          });
+        }
+      }
+    });
+
+    // ESTRATEGIA 2: Búsqueda por inicio de texto (útil para marcas)
+    excelData.forEach((product, index) => {
+      const productName = normalizeText(product.Producto || '');
+      const queryStart = normalizedQuery.substring(0, Math.min(6, normalizedQuery.length));
+      const productStart = productName.substring(0, Math.min(6, productName.length));
+      
+      if (queryStart.length >= 4) {
+        const distance = levenshteinDistance(queryStart, productStart);
+        if (distance <= 1) {
+          const similarity = 70;
+          const existing = productScores.get(index);
+          if (!existing || existing.similarity < similarity) {
+            productScores.set(index, {
+              product,
+              index,
+              similarity,
+              reasons: [`🎯 Inicio similar: "${queryStart}" ≈ "${productStart}"`]
+            });
+          }
+        }
+      }
+    });
+
+    // ESTRATEGIA 3: Búsqueda en aliases del producto
+    excelData.forEach((product, index) => {
+      const productAliases = aliases[index]?.aliases || [];
+      
+      productAliases.forEach(alias => {
+        const aliasSimilarity = calculateSimilarity(normalizedQuery, alias);
+        if (aliasSimilarity > 60) {
+          const existing = productScores.get(index);
+          if (!existing || existing.similarity < aliasSimilarity) {
+            productScores.set(index, {
+              product,
+              index,
+              similarity: aliasSimilarity,
+              reasons: [`🏷️ Alias: "${alias}"`]
+            });
+          }
+        }
+      });
+    });
+
+    // Convertir a array y ordenar
+    const results = Array.from(productScores.values())
+      .filter(item => item.similarity > 35) // Umbral muy permisivo
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 5);
+    
+    console.log('📋 Mejores coincidencias:');
+    results.forEach(r => {
+      console.log(`  ${r.similarity.toFixed(1)}% - ${r.product.Producto}`);
+      console.log(`    Razones: ${r.reasons.join(', ')}`);
+    });
+    
+    return results.map(({ product, index, similarity }) => ({
+      product,
+      index,
+      similarity
+    }));
   };
 
   // FUNCIÓN MEJORADA: showProductSuggestions con alternativas
