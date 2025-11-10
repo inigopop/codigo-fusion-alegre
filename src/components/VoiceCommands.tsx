@@ -336,7 +336,61 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     return matrix[str2.length][str1.length];
   };
 
-  // Función SUPER MEJORADA para buscar sugerencias con múltiples estrategias
+  // Nuevo algoritmo: Similitud fonética española (estilo Soundex)
+  const phoneticCode = (word: string): string => {
+    if (!word || word.length === 0) return '';
+    
+    let code = word.toLowerCase();
+    
+    // Conversiones fonéticas comunes en español
+    const phoneticMap: [RegExp, string][] = [
+      [/[áàäâ]/g, 'a'],
+      [/[éèëê]/g, 'e'],
+      [/[íìïî]/g, 'i'],
+      [/[óòöô]/g, 'o'],
+      [/[úùüû]/g, 'u'],
+      [/ch/g, 'x'],      // ch -> x
+      [/ll/g, 'y'],      // ll -> y
+      [/ñ/g, 'n'],       // ñ -> n
+      [/qu/g, 'k'],      // qu -> k
+      [/[ck]/g, 'k'],    // c,k -> k
+      [/[sz]/g, 's'],    // s,z -> s
+      [/[bv]/g, 'b'],    // b,v -> b
+      [/[gj]/g, 'j'],    // g,j -> j
+      [/h/g, ''],        // h silenciosa
+      [/y/g, 'i'],       // y -> i
+      [/ph/g, 'f'],      // ph -> f
+      [/w/g, 'u'],       // w -> u
+    ];
+    
+    phoneticMap.forEach(([pattern, replacement]) => {
+      code = code.replace(pattern, replacement);
+    });
+    
+    // Eliminar consonantes repetidas
+    code = code.replace(/(.)\1+/g, '$1');
+    
+    return code;
+  };
+
+  // Calcular similitud fonética entre dos palabras
+  const phoneticSimilarity = (word1: string, word2: string): number => {
+    const code1 = phoneticCode(word1);
+    const code2 = phoneticCode(word2);
+    
+    if (code1 === code2) return 100;
+    
+    // Usar Levenshtein en los códigos fonéticos
+    const distance = levenshteinDistance(code1, code2);
+    const maxLen = Math.max(code1.length, code2.length);
+    
+    if (maxLen === 0) return 0;
+    
+    const similarity = ((maxLen - distance) / maxLen) * 100;
+    return similarity;
+  };
+
+  // Función SUPER MEJORADA para buscar sugerencias con múltiples estrategias INCLUYENDO FONÉTICA
   const findProductSuggestions = (query: string): ProductSuggestion[] => {
     console.log('🔍 Buscando sugerencias para:', query);
     const normalizedQuery = normalizeText(query);
@@ -355,7 +409,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     // Mapa para acumular los mejores matches de cada producto
     const productScores = new Map<number, { product: any; index: number; similarity: number; reasons: string[] }>();
     
-    // ESTRATEGIA 1: Búsqueda por palabras clave individuales con Levenshtein
+    // ESTRATEGIA 1: Búsqueda por palabras clave individuales con Levenshtein Y FONÉTICA
     const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 2);
     
     excelData.forEach((product, index) => {
@@ -368,16 +422,19 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
 
       queryWords.forEach(qWord => {
         let bestWordMatch = 0;
+        let bestMatchWord = '';
         
         productWords.forEach(pWord => {
           // Coincidencia exacta
           if (qWord === pWord) {
             bestWordMatch = Math.max(bestWordMatch, 100);
+            bestMatchWord = pWord;
             matchReasons.push(`✓ "${qWord}" exacto`);
           }
           // Contiene
           else if (pWord.includes(qWord) || qWord.includes(pWord)) {
             bestWordMatch = Math.max(bestWordMatch, 85);
+            bestMatchWord = pWord;
             matchReasons.push(`≈ "${qWord}" en "${pWord}"`);
           }
           // Levenshtein (permite errores de transcripción)
@@ -385,16 +442,29 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             const distance = levenshteinDistance(qWord, pWord);
             const maxLen = Math.max(qWord.length, pWord.length);
             
-            // Permitir hasta 2 caracteres de diferencia para palabras largas
-            if (distance <= 2 && maxLen >= 4) {
-              const similarity = ((maxLen - distance) / maxLen) * 75;
-              bestWordMatch = Math.max(bestWordMatch, similarity);
-              matchReasons.push(`~ "${qWord}" ≈ "${pWord}" (dist: ${distance})`);
+            // Permitir hasta 3 caracteres de diferencia (era 2, ahora 3 para más tolerancia)
+            if (distance <= 3 && maxLen >= 4) {
+              const similarity = ((maxLen - distance) / maxLen) * 70;
+              if (similarity > bestWordMatch) {
+                bestWordMatch = similarity;
+                bestMatchWord = pWord;
+                matchReasons.push(`~ "${qWord}" ≈ "${pWord}" (dist: ${distance})`);
+              }
+            }
+            
+            // NUEVA: Similitud fonética - detecta "kathy" ≈ "cutty", "shark" ≈ "sark"
+            const phoneticSim = phoneticSimilarity(qWord, pWord);
+            if (phoneticSim >= 70 && phoneticSim > bestWordMatch) {
+              bestWordMatch = phoneticSim;
+              bestMatchWord = pWord;
+              matchReasons.push(`🔊 "${qWord}" suena como "${pWord}" (${phoneticSim.toFixed(0)}%)`);
+              console.log(`🔊 FONÉTICA: "${qWord}" ≈ "${pWord}" = ${phoneticSim.toFixed(0)}%`);
             }
           }
         });
         
-        if (bestWordMatch > 50) {
+        // BAJADO de 50 a 40 para ser más tolerante
+        if (bestWordMatch >= 40) {
           matchedWords++;
           totalWordScore += bestWordMatch;
         }
@@ -425,8 +495,8 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       
       if (queryStart.length >= 4) {
         const distance = levenshteinDistance(queryStart, productStart);
-        if (distance <= 1) {
-          const similarity = 70;
+        if (distance <= 2) { // Era 1, ahora 2 para más tolerancia
+          const similarity = 65;
           const existing = productScores.get(index);
           if (!existing || existing.similarity < similarity) {
             productScores.set(index, {
@@ -446,7 +516,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       
       productAliases.forEach(alias => {
         const aliasSimilarity = calculateSimilarity(normalizedQuery, alias);
-        if (aliasSimilarity > 60) {
+        if (aliasSimilarity > 50) { // Era 60, ahora 50
           const existing = productScores.get(index);
           if (!existing || existing.similarity < aliasSimilarity) {
             productScores.set(index, {
@@ -460,17 +530,29 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       });
     });
 
-    // Convertir a array y ordenar
+    // Convertir el mapa a array y ordenar por similitud
     const results = Array.from(productScores.values())
-      .filter(item => item.similarity > 35) // Umbral muy permisivo
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 5);
+      .slice(0, 15); // Top 15 mejores coincidencias (era 10, ahora 15 para más opciones)
     
-    console.log('📋 Mejores coincidencias:');
-    results.forEach(r => {
-      console.log(`  ${r.similarity.toFixed(1)}% - ${r.product.Producto}`);
-      console.log(`    Razones: ${r.reasons.join(', ')}`);
-    });
+    // NUEVA LÓGICA: Si la mejor coincidencia es < 60%, marcar como "baja confianza"
+    const bestScore = results.length > 0 ? results[0].similarity : 0;
+    const hasLowConfidence = bestScore < 60;
+    
+    // Log de resultados con razones
+    if (results.length > 0) {
+      console.log(`✅ Encontradas ${results.length} sugerencias (mejor: ${bestScore.toFixed(1)}%):`);
+      results.slice(0, 5).forEach((r, i) => {
+        console.log(`  ${i + 1}. ${r.product.Producto} (${r.similarity.toFixed(1)}%)`);
+        console.log(`     Razones:`, r.reasons.join(', '));
+      });
+      
+      if (hasLowConfidence) {
+        console.log('⚠️ ADVERTENCIA: Baja confianza en las coincidencias');
+      }
+    } else {
+      console.log('❌ No se encontraron sugerencias');
+    }
     
     return results.map(({ product, index, similarity }) => ({
       product,
@@ -508,12 +590,13 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setEditingPendingText('');
   };
 
-  // FUNCIÓN MEJORADA: showProductSuggestions con SIEMPRE mostrar opciones cuando hay duplicados
+  // FUNCIÓN MEJORADA: showProductSuggestions con verificación de confianza
   const showProductSuggestions = (productQuery: string, quantity: number) => {
     console.log('🔍 Mostrando sugerencias para:', productQuery, 'cantidad:', quantity);
     
     const suggestions = findProductSuggestions(productQuery);
     
+    // Si NO hay sugerencias, añadir a pendientes
     if (suggestions.length === 0) {
       console.log('❌ No se encontró ningún producto, añadiendo a pendientes de revisión');
       addToPendingReview(productQuery, quantity);
@@ -523,6 +606,21 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         variant: "destructive",
       });
       return;
+    }
+    
+    // NUEVA LÓGICA: Si la mejor coincidencia es < 65%, ofrecer añadir a pendientes también
+    const bestSimilarity = suggestions[0].similarity;
+    const hasLowConfidence = bestSimilarity < 65;
+    
+    if (hasLowConfidence) {
+      console.log(`⚠️ Baja confianza (${bestSimilarity.toFixed(1)}%), ofreciendo opciones pero también pendientes`);
+      // Añadir automáticamente a pendientes pero también mostrar sugerencias
+      addToPendingReview(productQuery, quantity);
+      toast({
+        title: "⚠️ Coincidencia parcial",
+        description: `"${productQuery}" tiene ${suggestions.length} posibles coincidencias (máx ${bestSimilarity.toFixed(0)}%). También se añadió a pendientes.`,
+        variant: "default",
+      });
     }
     
     // NUEVO: Comprobar si hay productos duplicados (mismo nombre)
