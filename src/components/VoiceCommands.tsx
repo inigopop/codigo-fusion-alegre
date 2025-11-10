@@ -26,6 +26,13 @@ interface MultipleProductUpdate {
   suggestions: ProductSuggestion[];
 }
 
+interface PendingReviewItem {
+  id: string;
+  productQuery: string;
+  quantity: number;
+  timestamp: number;
+}
+
 const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }: VoiceCommandsProps) => {
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -43,6 +50,12 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
   
   // Nuevo estado para el input de texto manual
   const [manualText, setManualText] = useState('');
+  
+  // Estados para pendientes de revisión
+  const [pendingReview, setPendingReview] = useState<PendingReviewItem[]>([]);
+  const [showPendingReview, setShowPendingReview] = useState(false);
+  const [editingPendingId, setEditingPendingId] = useState<string | null>(null);
+  const [editingPendingText, setEditingPendingText] = useState('');
   
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
@@ -466,24 +479,60 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }));
   };
 
-  // FUNCIÓN MEJORADA: showProductSuggestions con alternativas
+  // Función para añadir a pendientes de revisión
+  const addToPendingReview = (productQuery: string, quantity: number) => {
+    const newPending: PendingReviewItem = {
+      id: `${Date.now()}-${Math.random()}`,
+      productQuery,
+      quantity,
+      timestamp: Date.now()
+    };
+    setPendingReview(prev => [...prev, newPending]);
+    console.log('📝 Añadido a pendientes de revisión:', newPending);
+  };
+
+  // Función para eliminar de pendientes de revisión
+  const removePendingReview = (id: string) => {
+    setPendingReview(prev => prev.filter(p => p.id !== id));
+  };
+
+  // Función para procesar pendiente editado
+  const processEditedPending = (id: string) => {
+    const pending = pendingReview.find(p => p.id === id);
+    if (!pending || !editingPendingText.trim()) return;
+    
+    console.log('✏️ Procesando pendiente editado:', editingPendingText);
+    processVoiceCommand(`${editingPendingText} ${pending.quantity}`);
+    removePendingReview(id);
+    setEditingPendingId(null);
+    setEditingPendingText('');
+  };
+
+  // FUNCIÓN MEJORADA: showProductSuggestions con SIEMPRE mostrar opciones cuando hay duplicados
   const showProductSuggestions = (productQuery: string, quantity: number) => {
     console.log('🔍 Mostrando sugerencias para:', productQuery, 'cantidad:', quantity);
     
     const suggestions = findProductSuggestions(productQuery);
     
     if (suggestions.length === 0) {
+      console.log('❌ No se encontró ningún producto, añadiendo a pendientes de revisión');
+      addToPendingReview(productQuery, quantity);
       toast({
-        title: "❌ Producto no encontrado",
-        description: `No se encontró "${productQuery}". Intenta con otro nombre o código.`,
+        title: "📝 Añadido a pendientes de revisión",
+        description: `"${productQuery}" se guardó para revisión manual`,
         variant: "destructive",
       });
       return;
     }
     
-    // Si hay coincidencia exacta (> 85%), actualizar directamente
-    if (suggestions.length > 0 && suggestions[0].similarity >= 85) {
-      console.log('✅ Coincidencia fuerte detectada, actualizando directamente');
+    // NUEVO: Comprobar si hay productos duplicados (mismo nombre)
+    const hasExactDuplicates = suggestions.length >= 2 && 
+      suggestions[0].similarity >= 90 && 
+      suggestions[1].similarity >= 90;
+    
+    // Si hay coincidencia MUY EXACTA (>95%) y NO hay duplicados, actualizar directamente
+    if (suggestions.length === 1 && suggestions[0].similarity >= 95 && !hasExactDuplicates) {
+      console.log('✅ Coincidencia única y exacta, actualizando directamente');
       onUpdateStock(suggestions[0].index, quantity);
       toast({
         title: "✅ Stock actualizado",
@@ -492,10 +541,13 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       return;
     }
     
-    // Si hay varias alternativas, mostrar diálogo
+    // En cualquier otro caso, mostrar diálogo para que el usuario elija
+    console.log('🎯 Mostrando diálogo de selección');
     toast({
-      title: "🔍 Producto similar encontrado",
-      description: `Se encontraron ${suggestions.length} productos similares. Elige el correcto.`,
+      title: "🔍 Selecciona el producto correcto",
+      description: hasExactDuplicates 
+        ? `Se encontraron ${suggestions.length} productos con el mismo nombre. Elige el correcto.`
+        : `Se encontraron ${suggestions.length} productos similares. Elige el correcto.`,
     });
     
     setSuggestions(suggestions.slice(0, 5));
@@ -1331,6 +1383,123 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Sección de Pendientes de Revisión */}
+      {pendingReview.length > 0 && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-yellow-500 rounded-xl flex items-center justify-center">
+                  <Package className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg text-yellow-900">Pendientes de Revisión</h3>
+                  <p className="text-sm text-yellow-700">Productos que necesitan corrección manual</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPendingReview(!showPendingReview)}
+                className="border-yellow-300 hover:bg-yellow-100"
+              >
+                {showPendingReview ? 'Ocultar' : `Ver ${pendingReview.length}`}
+              </Button>
+            </div>
+
+            {showPendingReview && (
+              <div className="space-y-3 mt-4">
+                {pendingReview.map((pending) => (
+                  <div 
+                    key={pending.id}
+                    className="bg-white border border-yellow-200 rounded-lg p-4"
+                  >
+                    {editingPendingId === pending.id ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm text-yellow-700 mb-2">
+                          <span className="font-medium">Original:</span>
+                          <span>"{pending.productQuery}" → {pending.quantity} unidades</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={editingPendingText}
+                            onChange={(e) => setEditingPendingText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                processEditedPending(pending.id);
+                              } else if (e.key === 'Escape') {
+                                setEditingPendingId(null);
+                                setEditingPendingText('');
+                              }
+                            }}
+                            placeholder="Escribe el nombre correcto del producto"
+                            className="flex-1 px-3 py-2 border border-yellow-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                            autoFocus
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => processEditedPending(pending.id)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            Procesar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingPendingId(null);
+                              setEditingPendingText('');
+                            }}
+                            className="border-gray-300"
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Presiona Enter para procesar, ESC para cancelar
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">"{pending.productQuery}"</p>
+                          <p className="text-sm text-gray-600">Cantidad: {pending.quantity} unidades</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {new Date(pending.timestamp).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingPendingId(pending.id);
+                              setEditingPendingText(pending.productQuery);
+                            }}
+                            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                          >
+                            ✏️ Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => removePendingReview(pending.id)}
+                            className="border-red-300 text-red-700 hover:bg-red-50"
+                          >
+                            🗑️
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Información del sistema */}
       <div className="apple-card p-6 mt-6 bg-background/50 backdrop-blur-sm">
