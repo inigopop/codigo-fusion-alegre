@@ -686,8 +686,10 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           suggestions: suggestions.slice(0, 5)
         });
       } else {
+        // Añadir a pendientes de revisión en lugar de solo saltar
+        addToPendingReview(productQuery, quantity);
         skippedProducts.push({ productQuery, quantity });
-        console.log(`⏭️ [Comando ${commandIndex + 1}] "${productQuery}" saltado por falta de coincidencias`);
+        console.log(`📝 [Comando ${commandIndex + 1}] "${productQuery}" añadido a pendientes de revisión`);
       }
     });
     
@@ -697,19 +699,22 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     if (skippedProducts.length > 0) {
       const skippedList = skippedProducts.map(p => `"${p.productQuery}"`).join(', ');
       toast({
-        title: "⚠️ Productos saltados",
-        description: `Se saltaron ${skippedProducts.length} productos sin coincidencias: ${skippedList}`,
-        variant: "destructive",
+        title: "📝 Productos en pendientes de revisión",
+        description: `Se añadieron ${skippedProducts.length} productos sin coincidencias: ${skippedList}`,
+        variant: "default",
       });
     }
     
-    // Configurar estado para mostrar diálogo múltiple
-    setPendingUpdates(validUpdates);
-    setSkippedProducts(skippedProducts);
-    setCurrentUpdateIndex(0);
-    setShowMultipleDialog(true);
-    
-    console.log('🎯 RESULTADO: Mostrando diálogo múltiple con', validUpdates.length, 'productos válidos');
+    // Si hay productos válidos, configurar estado para mostrar diálogo múltiple
+    if (validUpdates.length > 0) {
+      setPendingUpdates(validUpdates);
+      setSkippedProducts(skippedProducts);
+      setCurrentUpdateIndex(0);
+      setShowMultipleDialog(true);
+      console.log('🎯 RESULTADO: Mostrando diálogo múltiple con', validUpdates.length, 'productos válidos');
+    } else {
+      console.log('⚠️ No hay productos válidos para procesar, todos fueron a pendientes');
+    }
   };
 
   // Función para añadir stock a un producto
@@ -888,7 +893,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     setTimeout(() => setIsProcessing(false), 1000);
   }, [excelData, onUpdateStock, wordsToNumber, toast]);
 
-  // Función para procesar texto manual
+  // Función para procesar texto manual (MEJORADA para mostrar siempre opciones)
   const processManualText = () => {
     if (!manualText.trim()) {
       toast({
@@ -900,7 +905,53 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     }
 
     console.log('📝 Procesando texto manual:', manualText);
-    processVoiceCommand(manualText.trim());
+    
+    // Convertir palabras a números primero
+    const commandWithNumbers = wordsToNumber(manualText.trim());
+    
+    // Detectar si es comando múltiple
+    const isMultiple = isMultipleProductCommand(commandWithNumbers);
+    
+    if (isMultiple) {
+      // Procesar como comando múltiple
+      console.log('📝 Detectado como comando múltiple en texto manual');
+      processVoiceCommand(commandWithNumbers);
+    } else {
+      // Para comandos simples, extraer producto y cantidad
+      const lowerCommand = commandWithNumbers.toLowerCase().trim();
+      const updatePatterns = [
+        /^(.+?)\s+(\d+(?:\.\d+)?)$/i,
+        /^(?:añadir?|agregar?|sumar?)\s+(.+?)\s+(\d+(?:\.\d+)?)$/i,
+        /^(?:actualizar?|cambiar?|poner?)\s+(.+?)\s+(?:a|con|en)\s+(\d+(?:\.\d+)?)$/i,
+      ];
+      
+      let commandProcessed = false;
+      
+      for (const pattern of updatePatterns) {
+        const match = lowerCommand.match(pattern);
+        if (match) {
+          const productQuery = match[1].trim();
+          const quantity = parseFloat(match[2]);
+          
+          if (!isNaN(quantity) && quantity > 0) {
+            console.log('📝 Comando manual simple:', { productQuery, quantity });
+            // Llamar directamente a showProductSuggestions para asegurar que se muestren todas las opciones
+            showProductSuggestions(productQuery, quantity);
+            commandProcessed = true;
+            break;
+          }
+        }
+      }
+      
+      if (!commandProcessed) {
+        toast({
+          title: "❌ Comando no reconocido",
+          description: "Intenta: 'producto cantidad' o 'producto1 cantidad1 producto2 cantidad2'",
+          variant: "destructive",
+        });
+      }
+    }
+    
     setManualText('');
   };
 
