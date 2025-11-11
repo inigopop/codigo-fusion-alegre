@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Mic, MicOff, Volume2, Plus, List, Package, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useProductAliases } from "@/hooks/useProductAliases";
@@ -1458,26 +1459,28 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
               </div>
               
               {/* Lista de todos los productos pendientes */}
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <h4 className="font-medium text-blue-700 mb-2">📋 Productos a actualizar:</h4>
-                <div className="space-y-1 text-sm">
-                  {pendingUpdates.map((update, index) => (
-                    <div 
-                      key={index} 
-                      className={`flex justify-between ${
-                        index === currentUpdateIndex 
-                          ? 'font-bold text-blue-800 bg-blue-100 px-2 py-1 rounded' 
-                          : index < currentUpdateIndex 
-                            ? 'text-green-600 line-through' 
-                            : 'text-gray-600'
-                      }`}
-                    >
-                      <span>{update.productQuery}</span>
-                      <span>+{update.quantity}</span>
-                    </div>
-                  ))}
+              <ScrollArea className="max-h-32">
+                <div className="bg-blue-50 p-3 rounded-lg mr-2">
+                  <h4 className="font-medium text-blue-700 mb-2">📋 Productos a actualizar:</h4>
+                  <div className="space-y-1 text-sm">
+                    {pendingUpdates.map((update, index) => (
+                      <div 
+                        key={index} 
+                        className={`flex justify-between ${
+                          index === currentUpdateIndex 
+                            ? 'font-bold text-blue-800 bg-blue-100 px-2 py-1 rounded' 
+                            : index < currentUpdateIndex 
+                              ? 'text-green-600 line-through' 
+                              : 'text-gray-600'
+                        }`}
+                      >
+                        <span>{update.productQuery}</span>
+                        <span>+{update.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </ScrollArea>
               
               {/* Productos saltados */}
               {skippedProducts.length > 0 && (
@@ -1498,38 +1501,42 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
               )}
               
               {/* Sugerencias para el producto actual */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-2">
                 <h4 className="font-medium">Selecciona el producto correcto:</h4>
-                {pendingUpdates[currentUpdateIndex]?.suggestions.map((suggestion, index) => (
-                  <div
-                    key={index}
-                    className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors hover:border-green-400"
-                    onClick={() => handleMultipleSuggestionSelect(suggestion)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-lg">{suggestion.product.Producto}</p>
-                        <p className="text-sm text-gray-600">
-                          Código: {suggestion.product.Material || suggestion.product.Codigo} | 
-                          Stock actual: {suggestion.product.Stock || 0} {suggestion.product.UMB}
-                        </p>
-                        <p className="text-xs text-green-600">
-                          Similitud: {Math.round(suggestion.similarity)}%
-                        </p>
+                <ScrollArea className="h-[300px]">
+                  <div className="space-y-3 pr-4">
+                    {pendingUpdates[currentUpdateIndex]?.suggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors hover:border-green-400"
+                        onClick={() => handleMultipleSuggestionSelect(suggestion)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <p className="font-medium text-lg">{suggestion.product.Producto}</p>
+                            <p className="text-sm text-gray-600">
+                              Código: {suggestion.product.Material || suggestion.product.Codigo} | 
+                              Stock actual: {suggestion.product.Stock || 0} {suggestion.product.UMB}
+                            </p>
+                            <p className="text-xs text-green-600">
+                              Similitud: {Math.round(suggestion.similarity)}%
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded">
+                            <Plus className="w-5 h-5" />
+                            <span className="font-bold text-lg">{pendingUpdates[currentUpdateIndex]?.quantity}</span>
+                          </div>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded">
-                        <Plus className="w-5 h-5" />
-                        <span className="font-bold text-lg">{pendingUpdates[currentUpdateIndex]?.quantity}</span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                </ScrollArea>
               </div>
             </div>
           )}
           
-          <div className="flex justify-between gap-2">
+          <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4 border-t mt-4">
             <Button 
               variant="outline" 
               onClick={() => {
@@ -1538,15 +1545,17 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                 setCurrentUpdateIndex(0);
                 setSkippedProducts([]);
               }}
+              className="w-full sm:w-auto"
             >
               Cancelar Todo
             </Button>
             
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               {currentUpdateIndex > 0 && (
                 <Button 
                   variant="outline"
                   onClick={() => setCurrentUpdateIndex(currentUpdateIndex - 1)}
+                  className="w-full sm:w-auto"
                 >
                   ← Anterior
                 </Button>
@@ -1588,10 +1597,11 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
                     }
                   }
                 }}
-                className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                className="bg-yellow-500 hover:bg-yellow-600 text-white w-full sm:w-auto"
               >
                 <Package className="w-4 h-4 mr-2" />
-                Añadir a revisión y continuar →
+                <span className="hidden sm:inline">Añadir a revisión y continuar →</span>
+                <span className="sm:hidden">Añadir a revisión →</span>
               </Button>
             </div>
           </div>
