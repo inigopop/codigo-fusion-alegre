@@ -1393,7 +1393,28 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             })}
           </div>
           
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex justify-between gap-2 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                // Añadir a pendientes de revisión si no está ya
+                const alreadyPending = pendingReview.some(p => 
+                  p.productQuery === searchQuery && p.quantity === pendingQuantity
+                );
+                if (!alreadyPending) {
+                  addToPendingReview(searchQuery, pendingQuantity);
+                  toast({
+                    title: "📝 Añadido a revisión",
+                    description: `"${searchQuery}" se guardó para revisión manual`,
+                  });
+                }
+                setShowSuggestionsDialog(false);
+              }}
+              className="shadow-sm border-yellow-300 hover:bg-yellow-50 text-yellow-700"
+            >
+              <Package className="w-4 h-4 mr-2" />
+              Añadir a revisión
+            </Button>
             <Button 
               variant="outline" 
               onClick={() => setShowSuggestionsDialog(false)}
@@ -1508,7 +1529,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
             </div>
           )}
           
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-2">
             <Button 
               variant="outline" 
               onClick={() => {
@@ -1521,14 +1542,58 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
               Cancelar Todo
             </Button>
             
-            {currentUpdateIndex > 0 && (
+            <div className="flex gap-2">
+              {currentUpdateIndex > 0 && (
+                <Button 
+                  variant="outline"
+                  onClick={() => setCurrentUpdateIndex(currentUpdateIndex - 1)}
+                >
+                  ← Anterior
+                </Button>
+              )}
+              
               <Button 
-                variant="outline"
-                onClick={() => setCurrentUpdateIndex(currentUpdateIndex - 1)}
+                variant="default"
+                onClick={() => {
+                  // Añadir el producto actual a pendientes de revisión
+                  const currentUpdate = pendingUpdates[currentUpdateIndex];
+                  if (currentUpdate) {
+                    addToPendingReview(currentUpdate.productQuery, currentUpdate.quantity);
+                    toast({
+                      title: "📝 Añadido a revisión y continuando",
+                      description: `"${currentUpdate.productQuery}" se guardó para revisión manual`,
+                    });
+                    
+                    // Continuar con el siguiente producto
+                    const nextIndex = currentUpdateIndex + 1;
+                    
+                    if (nextIndex < pendingUpdates.length) {
+                      console.log(`🔄 Pasando al siguiente: ${nextIndex} de ${pendingUpdates.length}`);
+                      setCurrentUpdateIndex(nextIndex);
+                      
+                      // Log del siguiente producto
+                      const nextUpdate = pendingUpdates[nextIndex];
+                      console.log(`➡️ Mostrando producto ${nextIndex + 1}: ${nextUpdate.productQuery}`);
+                    } else {
+                      // Ya terminamos todos los productos
+                      console.log('🎉 TERMINADO: Todos los productos válidos procesados');
+                      setShowMultipleDialog(false);
+                      setPendingUpdates([]);
+                      setCurrentUpdateIndex(0);
+                      
+                      toast({
+                        title: "✅ Proceso completado",
+                        description: `${pendingUpdates.length} productos procesados. Revisa los pendientes si es necesario.`,
+                      });
+                    }
+                  }
+                }}
+                className="bg-yellow-500 hover:bg-yellow-600 text-white"
               >
-                ← Anterior
+                <Package className="w-4 h-4 mr-2" />
+                Añadir a revisión y continuar →
               </Button>
-            )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
