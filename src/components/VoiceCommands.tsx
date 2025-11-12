@@ -1427,9 +1427,9 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
         </DialogContent>
       </Dialog>
 
-      {/* NUEVO Diálogo para comandos múltiples */}
+      {/* NUEVO Diálogo para comandos múltiples - LAYOUT DE 2 COLUMNAS */}
       <Dialog open={showMultipleDialog} onOpenChange={setShowMultipleDialog}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-6xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <List className="w-5 h-5" />
@@ -1446,165 +1446,194 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
           </DialogHeader>
           
           {pendingUpdates.length > 0 && (
-            <div className="space-y-4">
-              {/* Progreso visual */}
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
+            <>
+              {/* Progreso visual - Arriba para siempre visible */}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex-1 bg-secondary rounded-full h-2">
                   <div 
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
                     style={{ width: `${((currentUpdateIndex) / pendingUpdates.length) * 100}%` }}
                   />
                 </div>
-                <span>{currentUpdateIndex} / {pendingUpdates.length}</span>
+                <span className="font-medium">{currentUpdateIndex} / {pendingUpdates.length}</span>
               </div>
-              
-              {/* Lista de todos los productos pendientes */}
-              <ScrollArea className="max-h-32">
-                <div className="bg-blue-50 p-3 rounded-lg mr-2">
-                  <h4 className="font-medium text-blue-700 mb-2">📋 Productos a actualizar:</h4>
-                  <div className="space-y-1 text-sm">
-                    {pendingUpdates.map((update, index) => (
-                      <div 
-                        key={index} 
-                        className={`flex justify-between ${
-                          index === currentUpdateIndex 
-                            ? 'font-bold text-blue-800 bg-blue-100 px-2 py-1 rounded' 
-                            : index < currentUpdateIndex 
-                              ? 'text-green-600 line-through' 
-                              : 'text-gray-600'
-                        }`}
-                      >
-                        <span>{update.productQuery}</span>
-                        <span>+{update.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </ScrollArea>
-              
-              {/* Productos saltados */}
-              {skippedProducts.length > 0 && (
-                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                  <h4 className="font-medium text-yellow-700 mb-2">⚠️ Productos saltados ({skippedProducts.length}):</h4>
-                  <div className="space-y-1 text-sm">
-                    {skippedProducts.map((skipped, index) => (
-                      <div key={index} className="flex justify-between text-yellow-600">
-                        <span>"{skipped.productQuery}"</span>
-                        <span>+{skipped.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-yellow-600 mt-2">
-                    Estos productos se procesarán individualmente después de completar los válidos.
-                  </p>
-                </div>
-              )}
-              
-              {/* Sugerencias para el producto actual */}
-              <div className="space-y-2">
-                <h4 className="font-medium">Selecciona el producto correcto:</h4>
-                <ScrollArea className="h-[300px]">
-                  <div className="space-y-3 pr-4">
-                    {pendingUpdates[currentUpdateIndex]?.suggestions.map((suggestion, index) => (
-                      <div
-                        key={index}
-                        className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors hover:border-green-400"
-                        onClick={() => handleMultipleSuggestionSelect(suggestion)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-medium text-lg">{suggestion.product.Producto}</p>
-                            <p className="text-sm text-gray-600">
-                              Código: {suggestion.product.Material || suggestion.product.Codigo} | 
-                              Stock actual: {suggestion.product.Stock || 0} {suggestion.product.UMB}
-                            </p>
-                            <p className="text-xs text-green-600">
-                              Similitud: {Math.round(suggestion.similarity)}%
-                            </p>
+
+              {/* LAYOUT DE 2 COLUMNAS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[400px]">
+                {/* COLUMNA IZQUIERDA: Lista de productos a actualizar */}
+                <div className="space-y-4">
+                  {/* Lista de todos los productos pendientes */}
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                    <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <List className="w-4 h-4" />
+                      📋 Productos a actualizar
+                    </h4>
+                    <ScrollArea className="h-[200px]">
+                      <div className="space-y-2 pr-3">
+                        {pendingUpdates.map((update, index) => (
+                          <div 
+                            key={index} 
+                            className={`flex justify-between items-center p-2 rounded-lg transition-all ${
+                              index === currentUpdateIndex 
+                                ? 'font-bold bg-primary text-primary-foreground shadow-sm' 
+                                : index < currentUpdateIndex 
+                                  ? 'text-green-600 line-through opacity-60' 
+                                  : 'text-muted-foreground hover:bg-muted/50'
+                            }`}
+                          >
+                            <span className="truncate flex-1">{update.productQuery}</span>
+                            <span className="ml-2 font-semibold">+{update.quantity}</span>
                           </div>
-                          
-                          <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-2 rounded">
-                            <Plus className="w-5 h-5" />
-                            <span className="font-bold text-lg">{pendingUpdates[currentUpdateIndex]?.quantity}</span>
-                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                  
+                  {/* Productos saltados */}
+                  {skippedProducts.length > 0 && (
+                    <div className="bg-yellow-50 dark:bg-yellow-950/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-900">
+                      <h4 className="font-semibold text-yellow-700 dark:text-yellow-500 mb-2 flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        ⚠️ Productos saltados ({skippedProducts.length})
+                      </h4>
+                      <ScrollArea className="max-h-[150px]">
+                        <div className="space-y-1 text-sm pr-3">
+                          {skippedProducts.map((skipped, index) => (
+                            <div key={index} className="flex justify-between text-yellow-600 dark:text-yellow-400">
+                              <span className="truncate flex-1">"{skipped.productQuery}"</span>
+                              <span className="ml-2 font-semibold">+{skipped.quantity}</span>
+                            </div>
+                          ))}
                         </div>
+                      </ScrollArea>
+                      <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-2">
+                        Se procesarán después de completar los válidos.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* COLUMNA DERECHA: Selección de productos */}
+                <div className="space-y-4">
+                  <div className="bg-muted/30 border border-border rounded-lg p-4">
+                    <h4 className="font-semibold text-foreground mb-3">
+                      Selecciona el producto correcto:
+                    </h4>
+                    <ScrollArea className="h-[320px]">
+                      <div className="space-y-2 pr-3">
+                        {pendingUpdates[currentUpdateIndex]?.suggestions.map((suggestion, index) => (
+                          <div
+                            key={index}
+                            className="p-3 border border-border rounded-lg hover:bg-primary/5 hover:border-primary/50 cursor-pointer transition-all group"
+                            onClick={() => handleMultipleSuggestionSelect(suggestion)}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-foreground mb-1 truncate group-hover:text-primary transition-colors">
+                                  {suggestion.product.Producto}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Código: {suggestion.product.Material || suggestion.product.Codigo}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Stock: {suggestion.product.Stock || 0} {suggestion.product.UMB}
+                                </p>
+                                <span className={`inline-block text-xs px-2 py-0.5 rounded-full mt-1 ${
+                                  suggestion.similarity >= 85 
+                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
+                                    : suggestion.similarity >= 70 
+                                      ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' 
+                                      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
+                                }`}>
+                                  {Math.round(suggestion.similarity)}% coincidencia
+                                </span>
+                              </div>
+                              
+                              <div className="flex items-center gap-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 px-2 py-1 rounded-lg shrink-0">
+                                <Plus className="w-4 h-4" />
+                                <span className="font-bold text-sm">{pendingUpdates[currentUpdateIndex]?.quantity}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </ScrollArea>
                   </div>
-                </ScrollArea>
+                </div>
               </div>
-            </div>
-          )}
-          
-          <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4 border-t mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowMultipleDialog(false);
-                setPendingUpdates([]);
-                setCurrentUpdateIndex(0);
-                setSkippedProducts([]);
-              }}
-              className="w-full sm:w-auto"
-            >
-              Cancelar Todo
-            </Button>
-            
-            <div className="flex flex-col sm:flex-row gap-2">
-              {currentUpdateIndex > 0 && (
+
+              {/* Botones de acción - Siempre visibles abajo */}
+              <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4 border-t">
                 <Button 
-                  variant="outline"
-                  onClick={() => setCurrentUpdateIndex(currentUpdateIndex - 1)}
+                  variant="outline" 
+                  onClick={() => {
+                    setShowMultipleDialog(false);
+                    setPendingUpdates([]);
+                    setCurrentUpdateIndex(0);
+                    setSkippedProducts([]);
+                  }}
                   className="w-full sm:w-auto"
                 >
-                  ← Anterior
+                  Cancelar Todo
                 </Button>
-              )}
-              
-              <Button 
-                variant="default"
-                onClick={() => {
-                  // Añadir el producto actual a pendientes de revisión
-                  const currentUpdate = pendingUpdates[currentUpdateIndex];
-                  if (currentUpdate) {
-                    addToPendingReview(currentUpdate.productQuery, currentUpdate.quantity);
-                    toast({
-                      title: "📝 Añadido a revisión y continuando",
-                      description: `"${currentUpdate.productQuery}" se guardó para revisión manual`,
-                    });
-                    
-                    // Continuar con el siguiente producto
-                    const nextIndex = currentUpdateIndex + 1;
-                    
-                    if (nextIndex < pendingUpdates.length) {
-                      console.log(`🔄 Pasando al siguiente: ${nextIndex} de ${pendingUpdates.length}`);
-                      setCurrentUpdateIndex(nextIndex);
-                      
-                      // Log del siguiente producto
-                      const nextUpdate = pendingUpdates[nextIndex];
-                      console.log(`➡️ Mostrando producto ${nextIndex + 1}: ${nextUpdate.productQuery}`);
-                    } else {
-                      // Ya terminamos todos los productos
-                      console.log('🎉 TERMINADO: Todos los productos válidos procesados');
-                      setShowMultipleDialog(false);
-                      setPendingUpdates([]);
-                      setCurrentUpdateIndex(0);
-                      
-                      toast({
-                        title: "✅ Proceso completado",
-                        description: `${pendingUpdates.length} productos procesados. Revisa los pendientes si es necesario.`,
-                      });
-                    }
-                  }
-                }}
-                className="bg-yellow-500 hover:bg-yellow-600 text-white w-full sm:w-auto"
-              >
-                <Package className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">Añadir a revisión y continuar →</span>
-                <span className="sm:hidden">Añadir a revisión →</span>
-              </Button>
-            </div>
-          </div>
+                
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {currentUpdateIndex > 0 && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => setCurrentUpdateIndex(currentUpdateIndex - 1)}
+                      className="w-full sm:w-auto"
+                    >
+                      ← Anterior
+                    </Button>
+                  )}
+                  
+                  <Button 
+                    variant="default"
+                    onClick={() => {
+                      // Añadir el producto actual a pendientes de revisión
+                      const currentUpdate = pendingUpdates[currentUpdateIndex];
+                      if (currentUpdate) {
+                        addToPendingReview(currentUpdate.productQuery, currentUpdate.quantity);
+                        toast({
+                          title: "📝 Añadido a revisión y continuando",
+                          description: `"${currentUpdate.productQuery}" se guardó para revisión manual`,
+                        });
+                        
+                        // Continuar con el siguiente producto
+                        const nextIndex = currentUpdateIndex + 1;
+                        
+                        if (nextIndex < pendingUpdates.length) {
+                          console.log(`🔄 Pasando al siguiente: ${nextIndex} de ${pendingUpdates.length}`);
+                          setCurrentUpdateIndex(nextIndex);
+                          
+                          // Log del siguiente producto
+                          const nextUpdate = pendingUpdates[nextIndex];
+                          console.log(`➡️ Mostrando producto ${nextIndex + 1}: ${nextUpdate.productQuery}`);
+                        } else {
+                          // Ya terminamos todos los productos
+                          console.log('🎉 TERMINADO: Todos los productos válidos procesados');
+                          setShowMultipleDialog(false);
+                          setPendingUpdates([]);
+                          setCurrentUpdateIndex(0);
+                          
+                          toast({
+                            title: "✅ Proceso completado",
+                            description: `${pendingUpdates.length} productos procesados. Revisa los pendientes si es necesario.`,
+                          });
+                        }
+                      }
+                    }}
+                    className="bg-yellow-500 hover:bg-yellow-600 text-white w-full sm:w-auto"
+                  >
+                    <Package className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Añadir a revisión y continuar →</span>
+                    <span className="sm:hidden">Añadir a revisión →</span>
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
