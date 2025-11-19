@@ -772,7 +772,6 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
     // Separar productos con y sin sugerencias
     const validUpdates: MultipleProductUpdate[] = [];
     const skippedProducts: { productQuery: string; quantity: number }[] = [];
-    let autoProcessedCount = 0;
     
     commands.forEach(({ productQuery, quantity }, commandIndex) => {
       console.log(`🔍 [Comando ${commandIndex + 1}] Buscando: "${productQuery}" cantidad: ${quantity}`);
@@ -780,36 +779,21 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       console.log(`📋 [Comando ${commandIndex + 1}] Encontradas ${suggestions.length} sugerencias`);
       
       if (suggestions.length > 0) {
-        // Auto-procesar si la primera sugerencia tiene >95% de similitud
-        if (suggestions[0].similarity >= 95) {
-          console.log(`✅ [Comando ${commandIndex + 1}] Auto-procesado (${suggestions[0].similarity}% similitud)`);
-          onUpdateStock(suggestions[0].index, quantity);
-          autoProcessedCount++;
-        } else {
-          // Solo añadir a la lista si necesita confirmación manual
-          validUpdates.push({
-            productQuery,
-            quantity,
-            suggestions: suggestions.slice(0, 5)
-          });
-        }
+        // Todos los productos requieren confirmación manual
+        validUpdates.push({
+          productQuery,
+          quantity,
+          suggestions: suggestions.slice(0, 5)
+        });
       } else {
-        // Añadir a pendientes de revisión en lugar de solo saltar
+        // Añadir a pendientes de revisión si no hay sugerencias
         addToPendingReview(productQuery, quantity);
         skippedProducts.push({ productQuery, quantity });
         console.log(`📝 [Comando ${commandIndex + 1}] "${productQuery}" añadido a pendientes de revisión`);
       }
     });
     
-    console.log('✅ PREPARADO: Auto-procesados:', autoProcessedCount, 'Requieren confirmación:', validUpdates.length, 'Saltados:', skippedProducts.length);
-    
-    // Mostrar información de productos auto-procesados
-    if (autoProcessedCount > 0) {
-      toast({
-        title: `⚡ ${autoProcessedCount} productos actualizados automáticamente`,
-        description: "Productos con coincidencia exacta procesados.",
-      });
-    }
+    console.log('✅ PREPARADO: Requieren confirmación:', validUpdates.length, 'Saltados:', skippedProducts.length);
     
     // Mostrar información de productos saltados
     if (skippedProducts.length > 0) {
@@ -831,13 +815,7 @@ const VoiceCommands = ({ excelData, onUpdateStock, isListening, setIsListening }
       
       toast({
         title: "🎯 Confirmación requerida",
-        description: `${validUpdates.length} productos necesitan tu confirmación. ${autoProcessedCount > 0 ? `${autoProcessedCount} ya fueron actualizados automáticamente.` : ''}`,
-      });
-    } else if (autoProcessedCount > 0) {
-      // Todos fueron auto-procesados
-      toast({
-        title: "✅ ¡Proceso completado!",
-        description: `${autoProcessedCount} productos actualizados automáticamente${skippedProducts.length > 0 ? `, ${skippedProducts.length} añadidos a revisión` : ''}.`,
+        description: `${validUpdates.length} productos necesitan tu confirmación.`,
       });
     } else {
       // No hay productos válidos, solo saltados
